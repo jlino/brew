@@ -79,7 +79,7 @@ LiquidCrystal_I2C	lcd(LCD_I2C_ADDR,En_pin,Rw_pin,Rs_pin,D4_pin,D5_pin,D6_pin,D7_
 // ++++++++++++++++++++++++ Library - LiquidCrystal_I2C ++++++++++++++++++++++++
 // ++++++++++++++++++++++++ Rotary Encoder ++++++++++++++++++++++++
 volatile int  rotaryEncoderVirtualPosition = 0;
-//volatile int rotaryEncoderMaxPosition = 120;
+volatile int rotaryEncoderMaxPosition;
 volatile int menuSize = 2;
 const int PinCLK = 3;                   // Used for generating interrupts using CLK signal
 const int PinDT = 22;                    // Used for reading DT signal
@@ -135,6 +135,7 @@ enum manual_menu_list {
   manual_temperature,
   manual_time,
   manual_mode,
+  manual_mixer,
   manual_start,
   manual_back
 };
@@ -251,32 +252,6 @@ void isr ()  {                    // Interrupt service routine is executed when 
        
         break;
       }
-      case state_manual_mixer: {
-        if (!digitalRead(PinDT)) {
-          if ((interruptTime - lastInterruptTime) < 10) {
-            rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition + 5);
-          }
-          else {
-            rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition + 1);
-          }
-        }
-        else {
-          if ((interruptTime - lastInterruptTime) < 10) {
-            rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition - 5);
-          }
-          else {
-            rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition - 1);
-          }
-        }
-        if (rotaryEncoderVirtualPosition > mixerMaxSpeed) {
-            rotaryEncoderVirtualPosition = mixerMaxSpeed;
-        }
-        if (rotaryEncoderVirtualPosition < 0) {
-            rotaryEncoderVirtualPosition = 0;
-        }
-       
-        break;
-      }
       default: {
         
       }
@@ -321,7 +296,7 @@ void setup() {
 // ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
 // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
   pinMode(mixerPin, OUTPUT);
-  analogWrite(mixerPin, mixerSpeed);
+  analogWrite(mixerPin, 0);
 // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
 // ++++++++++++++++++++++++ Temperature Sensor PT100 ++++++++++++++++++++++++
   analogReference(EXTERNAL);
@@ -856,6 +831,7 @@ void runStart() {
   unsigned long runStartTime;
   unsigned long runTargetTime;
   cook_mode_list runCurrentMode;
+  unsigned long runMixerSpeed;
   
   // Configure environment
   boolean clockStart = false;
@@ -876,7 +852,16 @@ void runStart() {
         
         // check if time ended and is time to stop and return to menu
         if(clockStart && clockEnd) {
+          
+          // Turn mixer OFF for safety
+          analogWrite(mixerPin, 0);
+          
+          // Turn heading element OFF for safety
+          digitalWrite(HEATING_ELEMENT,LOW);
+          
+          // Pause for efect
           delay(1000);
+          
           return;
         }
         
@@ -986,6 +971,9 @@ void runStart() {
       Serial.print("] Rx: [");
       Serial.print(Rx, 6);
       */
+      
+      // Operate mixer
+      analogWrite(mixerPin, runMixerSpeed);
       
       // Operate the heating element
       Input = runCurrentTemperature;
