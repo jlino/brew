@@ -13,12 +13,12 @@
 //#define R3 100.05
 //#define calibragem 12.709066573
 
-float amostra1;//
+//float amostra1;//
 float temperatura, temperatura1;//
 float tabela[] = {100.00, 100.39, 100.78, 101.17, 101.56, 101.95, 102.34, 102.73, 103.12, 103.51, 103.90, 104.29, 104.68, 105.07, 105.46, 105.85, 106.24, 106.63, 107.02, 107.40, 107.79, 108.18, 108.57, 108.96, 109.35, 109.73, 110.12, 110.51, 110.90, 111.29, 111.67, 112.06, 112.45, 112.83, 113.22, 113.61, 114.00, 114.38, 114.77, 115.15, 115.54, 115.93, 116.31, 116.70, 117.08, 117.47, 117.86, 118.24, 118.63, 119.01, 119.40, 119.78, 120.17, 120.55, 120.94, 121.32, 121.71, 122.09, 122.47, 122.86, 123.24, 123.63, 124.01, 124.39, 124.78, 125.16, 125.54, 125.93, 126.31, 126.69, 127.08, 127.46, 127.84, 128.22, 128.61, 128.99, 129.37, 129.75, 130.13, 130.52, 130.90, 131.28, 131.66, 132.04, 132.42, 132.80, 133.18, 133.57, 133.95, 134.33, 134.71, 135.09, 135.47, 135.85, 136.23, 136.61, 136.99, 137.37, 137.75, 138.13, 138.51, 138.88, 139.26, 139.64, 140.02, 140.40, 140.78, 141.16, 141.54, 141.91, 142.29, 142.67, 143.05, 143.43, 143.80, 144.18, 144.56, 144.94, 145.31, 145.69, 146.07, 146.44, 146.82, 147.20, 147.57, 147.95, 148.33, 148.70, 149.08, 149.46, 149.83, 150.21, 150.58, 150.96, 151.33, 151.71, 152.08, 152.46, 152.83, 153.21, 153.58, 153.96, 154.33, 154.71, 155.08, 155.46, 155.83, 156.20, 156.58, 156.95, 157.33, 157.70, 158.07, 158.45, 158.82, 159.19, 159.56, 159.94, 160.31, 160.68, 150.00, 160.00, 161.05, 161.43, 161.80, 162.17, 162.54, 162.91, 163.29, 163.66, 164.03, 164.40, 164.77, 165.14, 165.51, 165.89, 166.26, 166.63, 167.00, 167.37, 167.74, 168.11, 168.48, 168.85, 169.22, 169.59, 169.96, 170.33, 170.70, 171.07, 171.43, 171.80, 172.17, 172.54, 172.91, 173.28, 173.65, 174.02, 174.38, 174.75, 175.12, 175.49, 175.86, 176.22, 176.59, 176.96, 177.33, 177.69, 178.06, 178.43, 178.79, 179.16};
 //float amostras[] = {630.00,630.00,630.00}; //,630.00,630.00,630.00,630.00,630.00,630.00,630.00,630.00,630.00,630.00,630.00,630.00,630.00,630.00,630.00,630.00,630.00};
 
-float Va;
+float Vout;
 float Rx;
 
 /*
@@ -53,13 +53,12 @@ float Rx;
 #define HEATING_ELEMENT  24
 // ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
 // ++++++++++++++++++++++++ Temperature ++++++++++++++++++++++++
+#define TEMPERATURE_SENSOR_PIN 30
 #define TEMPERATURE_MAX_POSITION 120
 // ++++++++++++++++++++++++ Temperature ++++++++++++++++++++++++
 // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
 #define MIXER_PIN 12
 #define MIXER_MAX_POSITION 255
-const int mixerPin = 12;
-const int mixerMaxSpeed = 255;
 // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
 // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
 #define SETTING_WELCOME_TIMEOUT  2000
@@ -154,7 +153,7 @@ enum cook_mode_list {
 int cookTime = 3600;
 int cookTemperature = 36;
 cook_mode_list cookMode = quick_start;
-int cookMixerSpeed = 130;
+int cookMixerSpeed = 180; //0; //130;
 // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
 // ++++++++++++++++++++++++ Global Variables ++++++++++++++++++++++++
 //float currentTemperatureCelsius;
@@ -295,11 +294,16 @@ void setup() {
   myPID.SetMode(AUTOMATIC);
 // ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
 // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
-  pinMode(mixerPin, OUTPUT);
-  analogWrite(mixerPin, 0);
+  pinMode(MIXER_PIN, OUTPUT);
+  analogWrite(MIXER_PIN, 0);
 // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
 // ++++++++++++++++++++++++ Temperature Sensor PT100 ++++++++++++++++++++++++
-  analogReference(EXTERNAL);
+//  analogReference(EXTERNAL);
+  analogReference(INTERNAL1V1);
+//  analogReference(INTERNAL2V56);
+
+  pinMode(TEMPERATURE_SENSOR_PIN, OUTPUT);
+  digitalWrite(TEMPERATURE_SENSOR_PIN, LOW);
 // ++++++++++++++++++++++++ Temperature Sensor PT100 ++++++++++++++++++++++++
   Serial.begin(9600); 
   Serial.println("Let's start Brewing!");
@@ -816,6 +820,9 @@ int getMixerSpeed(int init) {
       }
       lcd.print(rotaryEncoderVirtualPosition);
       lcd.println("                ");
+      
+      // DEBUG
+      analogWrite(MIXER_PIN, rotaryEncoderVirtualPosition);
     }
   }
   
@@ -854,7 +861,7 @@ void runStart() {
         if(clockStart && clockEnd) {
           
           // Turn mixer OFF for safety
-          analogWrite(mixerPin, 0);
+          analogWrite(MIXER_PIN, 0);
           
           // Turn heading element OFF for safety
           digitalWrite(HEATING_ELEMENT,LOW);
@@ -917,40 +924,35 @@ void runStart() {
       lcd.print("Wait       00:00");
     }
     
-    while(true) { 
-      amostra1 = analogRead(ponto1);
-      float Vs = 4.965; //4.9345;
-      float Vin = 8.84; //8.8345;
-      float adcStepCount = 1024.0;
-      float R1 = 149.3;
-      float Rl = 3.37;
-      float R_OpTemp = 19.7; //21.597; //24.37;
+    float amostra1 = -1;
+    float amostraAnterior = -1;
+    unsigned long lastTemperatureRead = millis();
+    
+    while(true) {
       
-      Va = amostra1 * Vs / adcStepCount;
-      //Rx = 151.5 * Va / ( 11.01 - Va ) - 30;
-      
-      Rx = R1 / ( Vin / Va - 1.0) - Rl - R_OpTemp;
-      
-      int i;
-      float i_f;
-      int tabelaSize = sizeof(tabela) / sizeof(float);
-      for( i = 0, i_f = 0.0; i <= tabelaSize; i++, i_f++) {
-        if((tabela[i]) > Rx) {
-          if(i == 0) {
-            runCurrentTemperature = -1.0;
-          }
-          else {
-            if(i == tabelaSize) {
-              runCurrentTemperature = 210.0;
-            }
-            else {
-              runCurrentTemperature = (i_f - 1.0) + ((Rx - tabela[i-1])/(tabela[i] - tabela[i-1]));
-            }
-          }
-          
-          break;
-        }
+      if(millis() - lastTemperatureRead >= 1000) {
+        amostraAnterior = amostra1;
+        digitalWrite(TEMPERATURE_SENSOR_PIN, HIGH);
+        //delay(20);
+        amostra1 = analogRead(ponto1);
+        digitalWrite(TEMPERATURE_SENSOR_PIN, LOW);
+        lastTemperatureRead = millis();
       }
+      
+      float Vs = 1.081; //4.9345;
+      float Vin = 4.87; //8.8345;
+      float adcStepCount = 1024.0;
+      float R1 = 606.0;
+      float Rl = 2.7; //2.9;
+      float R_OpTemp = 0; //19.7; //21.597; //24.37;
+      
+      //Vout = amostra1 * Vs / adcStepCount;// + 0.0079816667;
+      Vout = (amostra1+amostraAnterior) / 2 * Vs / adcStepCount;// + 0.0079816667;
+      //Rx = 151.5 * Vout / ( 11.01 - Vout ) - 30;
+      
+      Rx = R1 / ( Vin / Vout - 1.0) - Rl - R_OpTemp;
+      
+      runCurrentTemperature = 1.08271 * pow(10.0, -13.0) * (3.12508 * pow(10.0, 16.0) - 5.65566 * pow(10.0, 6.0) * sqrt(3.51501 * pow(10.0, 19.0) - 4.61805 * pow(10.0, 16.0) * Rx));
       
       /*
       Serial.print("O valor das entradas sao: [");
@@ -973,7 +975,7 @@ void runStart() {
       */
       
       // Operate mixer
-      analogWrite(mixerPin, runMixerSpeed);
+      analogWrite(MIXER_PIN, runMixerSpeed);
       
       // Operate the heating element
       Input = runCurrentTemperature;
@@ -996,8 +998,8 @@ void runStart() {
         if(Output != 0) {
           Serial.print("O valor das entradas sao: [");
           Serial.print(amostra1);
-          Serial.print("] Va[");
-          Serial.print(Va,6);
+          Serial.print("] Vout[");
+          Serial.print(Vout,6);
           Serial.print("] Rx[");
           Serial.print(Rx,6);
           Serial.print("] Temperature[");
@@ -1017,8 +1019,8 @@ void runStart() {
         if(Output != 0) {
           Serial.print("O valor das entradas sao: [");
           Serial.print(amostra1);
-          Serial.print("] Va[");
-          Serial.print(Va,6);
+          Serial.print("] Vout[");
+          Serial.print(Vout,6);
           Serial.print("] Rx[");
           Serial.print(Rx,6);
           Serial.print("] Temperature[");
@@ -1034,8 +1036,8 @@ void runStart() {
         else {
           Serial.print("O valor das entradas sao: [");
           Serial.print(amostra1);
-          Serial.print("] Va[");
-          Serial.print(Va,6);
+          Serial.print("] Vout[");
+          Serial.print(Vout,6);
           Serial.print("] Rx[");
           Serial.print(Rx,6);
           Serial.print("] Temperature[");
@@ -1045,27 +1047,29 @@ void runStart() {
       }
       
       // Print status to LCD
-      lcd.setCursor (5,0);
-      if (runCurrentTemperature < 10) {
-        lcd.print("  ");
-      }
-      else {
-        if (runCurrentTemperature < 100) {
-          lcd.print(" ");
+      //if(runCurrentTemperature > 0) {
+        lcd.setCursor (5,0);
+        if (runCurrentTemperature < 10) {
+          lcd.print("  ");
         }
-      }
-      lcd.print(runCurrentTemperature, 1);
-      
-      lcd.setCursor (11,0);
-      if (runTargetTemperature < 10) {
-        lcd.print("  ");
-      }
-      else {
-        if (runTargetTemperature < 100) {
-          lcd.print(" ");
+        else {
+          if (runCurrentTemperature < 100) {
+            lcd.print(" ");
+          }
         }
-      }
-      lcd.print(runTargetTemperature);
+        lcd.print(runCurrentTemperature, 1);
+        
+        lcd.setCursor (11,0);
+        if (runTargetTemperature < 10) {
+          lcd.print("  ");
+        }
+        else {
+          if (runTargetTemperature < 100) {
+            lcd.print(" ");
+          }
+        }
+        lcd.print(runTargetTemperature);
+      //}
       
       // Check if the target temperature has been reached so the clock can move forward.
       if(runCurrentTemperature == runTargetTemperature && clockStart == false) {
