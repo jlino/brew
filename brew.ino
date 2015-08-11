@@ -47,7 +47,7 @@
 #define ROTARY_ENCODER_CLK_PIN                    3    // Used for generating interrupts using CLK signal
 #define ROTARY_ENCODER_DT_PIN                     22    // Used for reading DT signal
 #define ROTARY_ENCODER_SW_PIN                     23    // Used for the push button switch
-#define ROTARY_ENCODER_DEBOUNCE_TIME              10    // Number of miliseconds to ignore new signals a signal is received
+#define ROTARY_ENCODER_DEBOUNCE_TIME              40    // Number of miliseconds to ignore new signals a signal is received
 
 // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
 #define SETTING_WELCOME_TIMEOUT                   100
@@ -147,6 +147,8 @@ volatile int            rotaryEncoderMinPosition = 0;
 volatile int            rotaryEncoderSingleStep = 1;
 volatile int            rotaryEncoderMultiStep = 1;
 
+volatile boolean        onISR = false;
+
 // ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
 int                     iWindowSize;             // Time frame to operate in
 unsigned long           windowStartTime;
@@ -172,12 +174,12 @@ void xSetupRotaryEncoder( eRotaryEncoderMode newMode, int newPosition, int newMa
 }
 
 void isr ()  {    // Interrupt service routine is executed when a HIGH to LOW transition is detected on CLK
-  repaint = true;
-  refresh = true;
   unsigned long interruptTime = millis();
+  unsigned long diff = interruptTime - lastInterruptTime;
+  lastInterruptTime = interruptTime;
   
   // If interrupts come faster than [ROTARY_ENCODER_DEBOUNCE_TIME]ms, assume it's a bounce and ignore
-  if ((interruptTime - lastInterruptTime) > ROTARY_ENCODER_DEBOUNCE_TIME) {
+  if (diff > ROTARY_ENCODER_DEBOUNCE_TIME) {
     switch(rotaryEncoderMode) {
   
       // Input of rotary encoder controling menus
@@ -264,7 +266,8 @@ void isr ()  {    // Interrupt service routine is executed when a HIGH to LOW tr
     }
   }
   
-  lastInterruptTime = interruptTime;
+  repaint = true;
+  refresh = true;
 }
 
 // ######################### START #########################
