@@ -54,7 +54,7 @@
 #define SETTING_MAX_INACTIVITY_TIME  		3000
 #define MENU_MAX_DEPTH 				10
 #define MENU_INIT_VALUES 			-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
-#define MENU_SIZE_MAIN_MENU		16
+#define MENU_SIZE_MAIN_MENU		17
 #define SETTING_SERIAL_MONITOR_BAUD_RATE	9600
 #define SETTING_SERIAL_MONITOR_WELCOME_MESSAGE	"Let's start Brewing!"
 
@@ -79,93 +79,21 @@
 // ++++++++++++++++++++++++ PT100 +++++++++++++++++++++++++++++++++
 #include <PT100.h>
 
+// ++++++++++++++++++++++++ ENUM +++++++++++++++++++++++++++++++++
+#include "CustomDataStructures.h"
+
 // ######################### VARIABLES #########################
-// ++++++++++++++++++++++++ Rotary Encoder ++++++++++++++++++++++++
-volatile int rotaryEncoderVirtualPosition;
-volatile int rotaryEncoderMaxPosition;
-volatile int rotaryEncoderMinPosition;
-volatile int rotaryEncoderSingleStep;
-volatile int rotaryEncoderMultiStep;
-
-// ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
-int WindowSize;							// Time frame to operate in
-unsigned long windowStartTime;
-unsigned long dWattPerPulse;
-
 // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
-// global
-enum TRotaryEncoderMode {
-  eRotaryEncoderMode_Menu,
-  eRotaryEncoderMode_Time,
-  eRotaryEncoderMode_Generic,
-  eRotaryEncoderMode_Disabled
-};
-TRotaryEncoderMode rotaryEncoderMode;
+eRotaryEncoderMode      rotaryEncoderMode;
+eMainMenuOptions        mainMenuOption;
+ePresetsMenuOptions     presetsMenuOption;
+eMaltMenuOptions        maltMenuOption;
+eSettingsMenuOptions    settingsMenuOption;
+eCookingStages          cookingStage;
 
-// menu
-enum eMainMenuOptions {
-  eMainMenu_GO,
-  eMainMenu_Presets,
-  eMainMenu_Malt,
-  eMainMenu_Startpoint,
-  eMainMenu_BetaGlucanase,
-  eMainMenu_Debranching,
-  eMainMenu_Proteolytic,
-  eMainMenu_BetaAmylase,
-  eMainMenu_AlphaAmylase,
-  eMainMenu_Mashout,
-  eMainMenu_Recirculation,
-  eMainMenu_Sparge,
-  eMainMenu_Boil,
-  eMainMenu_Hops,
-  eMainMenu_Cooling,
-  eMainMenu_Settings
-};
-eMainMenuOptions mainMenuOption;
-
-enum ePresetsMenuOptions {
-  ePresetsMenu_Trigo,
-  ePresetsMenu_IPA,
-  ePresetsMenu_Belga,
-  ePresetsMenu_Red,
-  ePresetsMenu_APA,
-  ePresetsMenu_Back,
-};
-ePresetsMenuOptions presetsMenuOption;
-
-enum eMaltMenuOptions {
-  eMaltMenu_CastleMalting_Chteau_Pilsen_2RS,
-  eMaltMenu_CastleMalting_Wheat_Blanc,
-  eMaltMenu_Back,
-};
-eMaltMenuOptions maltMenuOption;
-
-enum eSettingsMenuOptions {
-  eSettingsMenu_PT100_Element,
-  eSettingsMenu_PT100_Up,
-  eSettingsMenu_PT100_Down,
-  eSettingsMenu_Back,
-};
-eSettingsMenuOptions settingsMenuOption;
-
-// cooking
-enum eCookingStages {
-  eCookingStage_Startpoint,
-  eCookingStage_BetaGlucanase,
-  eCookingStage_Debranching,
-  eCookingStage_Proteolytic,
-  eCookingStage_BetaAmylase,
-  eCookingStage_AlphaAmylase,
-  eCookingStage_Mashout,
-  eCookingStage_Recirculation,
-  eCookingStage_Sparge,
-  eCookingStage_Boil,
-  eCookingStage_Cooling,
-	eCookingStage_Done
-};
-eCookingStages cookingStage;
 // ++++++++++++++++++++++++ Global Variables ++++++++++++++++++++++++
 boolean         cooking;
+boolean         bStageFirstRun;
 
 int             clockStartTime;
 int             clockCounter;
@@ -212,6 +140,18 @@ boolean         repaint;
 // ++++++++++++++++++++++++ Interrupts ++++++++++++++++++++++++
 static unsigned long lastInterruptTime;
 
+// ++++++++++++++++++++++++ Rotary Encoder ++++++++++++++++++++++++
+volatile int rotaryEncoderVirtualPosition = 0;
+volatile int rotaryEncoderMaxPosition = 1;
+volatile int rotaryEncoderMinPosition = 0;
+volatile int rotaryEncoderSingleStep = 1;
+volatile int rotaryEncoderMultiStep = 1;
+
+// ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
+int iWindowSize;             // Time frame to operate in
+unsigned long windowStartTime;
+double dWattPerPulse;
+
 // ######################### INITIALIZE #########################
 // ++++++++++++++++++++++++ Library - LiquidCrystal_I2C ++++++++++++++++++++++++
 LiquidCrystal_I2C	lcd(LCD_I2C_ADDR, LCD_EN_PIN, LCD_RW_PIN, LCD_RS_PIN, LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
@@ -222,7 +162,7 @@ PT100 upPT100(PT100_UP_OUTPUT_PIN, PT100_UP_INPUT_PIN, PT100_UP_TIME_BETWEEN_REA
 PT100 downPT100(PT100_DOWN_OUTPUT_PIN, PT100_DOWN_INPUT_PIN, PT100_DOWN_TIME_BETWEEN_READINGS, PT100_DOWN_DEFAULT_ADC_VMAX, PT100_DOWN_DEFAULT_VS, PT100_DOWN_DEFAULT_R1_RESISTENCE, PT100_DOWN_DEFAULT_LINE_RESISTENCE, PT100_DOWN_DEFAULT_OPERATION_RESISTENCE);
 
 // ######################### INTERRUPTS #########################
-void xSetupRotaryEncoder( TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep ) {
+void xSetupRotaryEncoder( eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep ) {
 	if( newMode >= 0 ) rotaryEncoderMode = newMode;
 	if( newPosition >= 0 ) rotaryEncoderVirtualPosition = newPosition;
 	if( newMaxPosition >= 0 ) rotaryEncoderMaxPosition = newMaxPosition;
@@ -260,9 +200,7 @@ void isr ()  {		// Interrupt service routine is executed when a HIGH to LOW tran
       
       // Input of rotary encoder controling time variables
       case eRotaryEncoderMode_Time: {
-				xDecodeRotaryEncoder();
-				
-        if (!digitalRead(ROTARY_ENCODER_DT_PIN)) {
+				if (!digitalRead(ROTARY_ENCODER_DT_PIN)) {
           if(rotaryEncoderVirtualPosition >= 60) {
             rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition + rotaryEncoderMultiStep);
           }
@@ -354,9 +292,6 @@ void setup() {
   windowStartTime = 	millis();
 	dWattPerPulse = HEATING_ELEMENT_MAX_WATTAGE / HEATING_ELEMENT_AC_FREQUENCY_HZ;
 
-  myPID.SetOutputLimits	(0, WindowSize);		// tell the PID to range between 0 and the full window size
-  myPID.SetMode		(AUTOMATIC);			// turn the PID on
-
 	// ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
 	//  pinMode		(MIXER_PIN, OUTPUT);
 	//  analogWrite		(MIXER_PIN, 0);
@@ -379,7 +314,7 @@ void setup() {
 
 	// ######################### INITIALIZE #########################
 	// ++++++++++++++++++++++++ Rotary Encoder ++++++++++++++++++++++++
-	// set operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+	// set operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 	xSetupRotaryEncoder( eRotaryEncoderMode_Disabled, 0, 0, 0, 0, 0 );
 
 	// ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
@@ -389,6 +324,7 @@ void setup() {
 	cookingStage 								=		eCookingStage_Startpoint;
 	// ++++++++++++++++++++++++ Global Variables ++++++++++++++++++++++++
 	cooking                     =   false;
+  bStageFirstRun              =   true;
 
 	clockStartTime              =   0;
 	clockCounter                =   0;
@@ -433,7 +369,7 @@ void setup() {
 	lastInterruptTime 					= 	0;
 
 	// ++++++++++++++++++++++++ PID  ++++++++++++++++++++++++
-	WindowSize 									= 	HEATING_ELEMENT_DEFAULT_WINDOW_SIZE;		// Time frame to operate in
+	iWindowSize 									= 	HEATING_ELEMENT_DEFAULT_WINDOW_SIZE;		// Time frame to operate in
 
 // ######################### Code - Run Once #########################
   xSafeHardwarePowerOff();
@@ -552,7 +488,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -562,7 +498,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Presets, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -572,7 +508,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Malt, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -582,7 +518,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Startpoint, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -592,7 +528,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_BetaGlucanase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -602,7 +538,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -612,7 +548,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Proteolytic, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -622,7 +558,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_BetaAmylase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -632,7 +568,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_AlphaAmylase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -642,7 +578,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Mashout, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -652,7 +588,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Recirculation, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -662,7 +598,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Sparge, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -672,7 +608,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Boil, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -682,7 +618,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Hops, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -692,7 +628,7 @@ void displayMainMenu() {
       
       menu_position[0] = -1;
 			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+			// reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Cooling, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
@@ -701,9 +637,19 @@ void displayMainMenu() {
       MainMenu_Settings();
       
       menu_position[0] = -1;
-			
-			// reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-			xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      
+      break;
+    }
+    case eMainMenu_Back: {
+      MainMenu_Back();
+      
+      menu_position[0] = -1;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
       
       break;
     }
@@ -796,8 +742,13 @@ void displayMainMenu() {
             lcd.print("-> Settings     ");
             break;
           }
+          case eMainMenu_Back: {
+            lcd.setCursor (0,1);        // go to start of 2nd line
+            lcd.print("-> Back         ");
+            break;
+          }
           default: {
-            // reset operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+            // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 						xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
           } 
         }
@@ -822,10 +773,14 @@ void MainMenu_GO() {
 }
 
 void MainMenu_Presets() {
+
+  backToStatus();
 	
 }
 
 void MainMenu_Malt() {
+
+  backToStatus();
 	
 }
 
@@ -833,76 +788,105 @@ void MainMenu_Startpoint() {
 	startpointTime = getTimer( startpointTime );
 	
 	startpointTemperature = xSetGenericValue( startpointTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_BetaGlucanase() {
 	betaGlucanaseTime = getTimer( betaGlucanaseTime );
 	
 	betaGlucanaseTemperature = xSetGenericValue( betaGlucanaseTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_Debranching() {
 	debranchingTime = getTimer( debranchingTime );
 	
 	debranchingTemperature = xSetGenericValue( debranchingTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_Proteolytic() {
 	proteolyticTime = getTimer( proteolyticTime );
 	
 	proteolyticTemperature = xSetGenericValue( proteolyticTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_BetaAmylase() {
 	betaAmylaseTime = getTimer( betaAmylaseTime );
 	
 	betaAmylaseTemperature = xSetGenericValue( betaAmylaseTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_AlphaAmylase() {
 	alphaAmylaseTime = getTimer( alphaAmylaseTime );
 	
 	alphaAmylaseTemperature = xSetGenericValue( alphaAmylaseTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_Mashout() {
 	mashoutTime = getTimer( mashoutTime );
 	
 	mashoutTemperature = xSetGenericValue( mashoutTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_Recirculation() {
 	recirculationTime = getTimer( recirculationTime );
 	
 	recirculationTemperature = xSetGenericValue( recirculationTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_Sparge() {
 	spargeTime = getTimer( spargeTime );
 	
 	spargeTemperature = xSetGenericValue( spargeTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_Boil() {
 	boilTime = getTimer( boilTime );
 	
 	boilTemperature = xSetGenericValue( boilTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_Hops() {
+
+  backToStatus();
 	
 }
 
-void MainMenu_Coooling() {
+void MainMenu_Cooling() {
 	coolingTime = getTimer( coolingTime );
 	
 	coolingTemperature = xSetGenericValue( coolingTemperature, 0, 120, "temperature", "*C" );
+
+  backToStatus();
 }
 
 void MainMenu_Settings() {
-	
+
+  backToStatus();
+  
 }
 
+void MainMenu_Back() {
+  backToStatus();
+}
 
 void xCountTheTime( int temperatureRange ) {
 	// Check if the machine is in the right temperature range, for the current mode,
@@ -921,19 +905,19 @@ bool isTimeLeft() {
 	return true;
 }
 
-unsigned long ulWattToWindowTime( unsigned long appliedWatts ) {
-  unsigned long ulPulsesRequired = ulAppliedWatts / dWattPerPulse;
-	return windowSize / 1000.0 * ulPulsesRequired;
+double ulWattToWindowTime( double ulAppliedWatts ) {
+  double ulPulsesRequired = ulAppliedWatts / dWattPerPulse;
+	return (double)iWindowSize / 1000.0 * ulPulsesRequired;
 }
 
 bool xRegulateTemperature() {
-	double diference = basePT100.getCurrentTemperature() - cookTemperature;
+	double difference = basePT100.getCurrentTemperature() - cookTemperature;
 	bool overTemperature = false;
-	unsigned long wattage = 0.0;
+	double wattage = 0.0;
 	
 	// Deviation between the cook temperature set and the cook temperature measured
-	if( diference < 0.0 ) {
-		diference = diference * (-1.0);
+	if( difference < 0.0 ) {
+		difference = difference * (-1.0);
 		overTemperature = true;
 	}
 	
@@ -942,19 +926,19 @@ bool xRegulateTemperature() {
 		// turn it off
 		wattage = 0.0;
 	} else {
-		if(diffrence <= 1) {
+		if(difference <= 1) {
 			// turn it off
 			wattage = 0.0;
 		} else {
-			if(diffrence <= 3) {
+			if(difference <= 3) {
 				// pulse lightly at 500 watt
 				wattage = 500.0;
 			} else {
-				if(diffrence <= 6) {
+				if(difference <= 6) {
 					// pulse moderately at 1000 watt
 					wattage = 1000.0;
 				} else {
-					if(diffrence <= 9) {
+					if(difference <= 9) {
 						// pulse hardly at 2000 watt
 					wattage = 2000.0;
 					} else {
@@ -967,8 +951,8 @@ bool xRegulateTemperature() {
 	}
 	
 	// Update the recorded time for the begining of the window, if the previous window has passed
-  while((millis() - windowStartTime) > WindowSize) { // Check if it's time to vary the pulse width modulation and if so do it by shifting the "Relay in ON" Window
-    windowStartTime += WindowSize;
+  while((millis() - windowStartTime) > iWindowSize) { // Check if it's time to vary the pulse width modulation and if so do it by shifting the "Relay in ON" Window
+    windowStartTime += iWindowSize;
   }
 	
 	// Apply wattage to the element at the right time
@@ -997,7 +981,7 @@ void xStageFirstRun( int stageTime, int stageTemperature ) {
 
 void xTransitionIntoStage_GlobalVariables(eCookingStages nextStage) {
 	// Reset global stage variables
-	stageFirstRun = true;
+	bStageFirstRun = true;
 	cookingStage = nextStage;
 }
 
@@ -1014,9 +998,9 @@ void xTransitionIntoStage(eCookingStages nextStage) {
 }
 
 void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemperatureRange, eCookingStages nextStage ) {
-	if(stageFirstRun) {
+	if(bStageFirstRun) {
 		// Don't run this again
-		stageFirstRun = false;
+		bStageFirstRun = false;
 		
 		// When the stage should be skipped
 		if( iStageTime == 0) {
@@ -1053,7 +1037,6 @@ void xWarnCookEnded() {
   /// TODO
 }
 
-bool stageFirstRun = true;
 void operateMachine() {
 
   // Measure temperature, for effect
@@ -1174,7 +1157,7 @@ void backToStatus() {
 
 // #################################################### Set Variables ##################################################################
 int getTimer(int init) {
-	// set operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+	// set operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 	xSetupRotaryEncoder( eRotaryEncoderMode_Time, init, 7200, 0, 1, 30 );
 
   // initialize variables
@@ -1223,13 +1206,10 @@ int getTimer(int init) {
     }
   }
   
-  backToStatus();
-  rotaryEncoderMode = initialState;
   return rotaryEncoderVirtualPosition;
 }
 
 int getTemperature(int init) {
-  TRotaryEncoderMode initialState = rotaryEncoderMode;
   
   // set operation state
   rotaryEncoderMode = eRotaryEncoderMode_Generic;
@@ -1283,13 +1263,11 @@ int getTemperature(int init) {
     }
   }
   
-  backToStatus();
-  rotaryEncoderMode = initialState;
   return rotaryEncoderVirtualPosition;
 }
 
 int xSetGenericValue(int init, int min, int max, char *valueName, char *unit) {	
-	// set operation state | INPUT : TRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+	// set operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
 	xSetupRotaryEncoder( eRotaryEncoderMode_Generic, init, max, min, 1, 5 );
 
   // initialize variables
