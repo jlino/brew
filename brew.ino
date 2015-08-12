@@ -42,6 +42,14 @@
 //#define MIXER_PIN     12
 //#define MIXER_MAX_POSITION   255
 
+// ++++++++++++++++++++++++ Pump ++++++++++++++++++++++++
+#define PUMP_PIN                                  6
+#define PUMP_SPEED_STOP                           0
+#define PUMP_SPEED_SLOW                           64
+#define PUMP_SPEED_AVERAGE                        128
+#define PUMP_SPEED_FAST                           192
+#define PUMP_SPEED_MAX                            255
+
 // ++++++++++++++++++++++++ Rotary Encoder ++++++++++++++++++++++++
 #define ROTARY_ENCODER_INTERRUPT_NUMBER           1    // On Mega2560 boards, interrupt 1 is on pin 3
 #define ROTARY_ENCODER_CLK_PIN                    3    // Used for generating interrupts using CLK signal
@@ -170,6 +178,9 @@ int                     iWindowSize;             // Time frame to operate in
 unsigned long           windowStartTime;
 double                  dWattPerPulse;
 
+// ++++++++++++++++++++++++ Pump ++++++++++++++++++++++++
+int                     iPumpSpeed;             // Time frame to operate in
+
 // ######################### INITIALIZE #########################
 // ++++++++++++++++++++++++ Library - LiquidCrystal_I2C ++++++++++++++++++++++++
 LiquidCrystal_I2C       lcd(LCD_I2C_ADDR, LCD_EN_PIN, LCD_RW_PIN, LCD_RS_PIN, LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
@@ -279,6 +290,7 @@ void isr ()  {    // Interrupt service routine is executed when a HIGH to LOW tr
 // ######################### START #########################
 void xSafeHardwarePowerOff() {
 //  analogWrite(MIXER_PIN, 0);        // Turn mixer OFF for safety
+  analogWrite(PUMP_PIN, PUMP_SPEED_STOP);  // analogWrite values from 0 to 255
   digitalWrite(HEATING_ELEMENT_OUTPUT_PIN, LOW);  // Turn heading element OFF for safety
   //basePT100.xSafeHardwarePowerOff();                  // Turn temperature sensor OFF for safety
 }
@@ -304,6 +316,11 @@ void setup() {
   // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
   //  pinMode    (MIXER_PIN, OUTPUT);
   //  analogWrite    (MIXER_PIN, 0);
+
+  // ++++++++++++++++++++++++ Pump ++++++++++++++++++++++++
+  pinMode(PUMP_PIN, OUTPUT);   // sets the pin as output
+  iPumpSpeed                  =   PUMP_SPEED_STOP;             // Time frame to operate in
+  analogWrite(PUMP_PIN, iPumpSpeed);  // analogWrite values from 0 to 255
 
   // ++++++++++++++++++++++++ Temperature Sensor PT100 ++++++++++++++++++++++++
   //basePT100.setup();
@@ -888,9 +905,9 @@ void MainMenu_Cooling() {
 }
 
 void MainMenu_Settings() {
+  iPumpSpeed = xSetGenericValue( iPumpSpeed, 0, 255, "Pump Speed", "PWM" );
 
   backToStatus();
-  
 }
 
 void MainMenu_Back() {
@@ -982,11 +999,15 @@ bool xRegulateTemperature() {
   }
 }
 
+bool xRegulatePumpSpeed() {
+  analogWrite(PUMP_PIN, iPumpSpeed);  // analogWrite values from 0 to 255
+}
+
 void xWarnClockEnded() {
   /// TODO
 }
 
-void xStageFirstRun( int stageTime, int stageTemperature ) {
+void xStageFirstRun( int stageTime, int stageTemperature, int stagePumpSpeed ) {
   // Set the clock
   cookTime = stageTime;
   
@@ -996,6 +1017,9 @@ void xStageFirstRun( int stageTime, int stageTemperature ) {
   // Reset the clock
   clockStartTime = millis();
   clockIgnore = 0;
+
+  // Set the pump speed
+  iPumpSpeed = stagePumpSpeed;
 }
 
 void xTransitionIntoStage_GlobalVariables(eCookingStages nextStage) {
@@ -1030,7 +1054,7 @@ void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemp
       return;
     } else {
       // Set the clock, target temperature and Reset the clock
-      xStageFirstRun( iStageTime, iStageTemperature );
+      xStageFirstRun( iStageTime, iStageTemperature, PUMP_SPEED_SLOW );
     }
   } else {
     // Account for time spent at the target temperature | Input 1: range in ºC within which the target temperature is considered to be reached
@@ -1039,6 +1063,9 @@ void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemp
     if( isTimeLeft() ) {
       // Do temperature control
       xRegulateTemperature();
+
+      // Do flow control
+      xRegulatePumpSpeed();
       
     } else {
       // Continue to the next stage
