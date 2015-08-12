@@ -82,6 +82,17 @@
 // ++++++++++++++++++++++++ ENUM +++++++++++++++++++++++++++++++++
 #include "CustomDataStructures.h"
 
+// ######################### TEMPLATES #########################
+// ++++++++++++++++++++++++ Debug ++++++++++++++++++++++++
+template <class T> void debugPrintVar( char *name, const T& value );
+template <class T> void debugPrintVar( char *name, const T& value ) {
+  Serial.print("[");
+  Serial.print(name);
+  Serial.print(":");
+  Serial.print(value);
+  Serial.println("]");
+}
+
 // ######################### VARIABLES #########################
 // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
 eRotaryEncoderMode      rotaryEncoderMode;
@@ -885,6 +896,12 @@ void xCountTheTime( int temperatureRange ) {
   // Check if the machine is in the right temperature range, for the current mode,
   if(!(basePT100.getCurrentTemperature() > (cookTemperature - temperatureRange) && basePT100.getCurrentTemperature() < (cookTemperature + temperatureRange))) {
     clockIgnore += millis() - clockStartTime - clockCounter;
+#ifdef DEBUG
+    Serial.print("[clockIgnore:");
+    Serial.print(clockIgnore);
+    Serial.println("]");
+    debugPrintVar("clockIgnore", clockIgnore);
+#endif
   }
   
   // Calculate the remaining time on the clock
@@ -1353,4 +1370,5 @@ void lcdPrint(String title, String message) {
     }
   }
 }
+
 
