@@ -1328,8 +1328,6 @@ int xSetGenericValue(int init, int min, int max, char *valueName, char *unit) {
   lcd.print( "       0 " );
   lcd.print( unit );
   
-  rotaryEncoderMaxPosition = TEMPERATURE_SETTING_MAX_VALUE;
-  
   while(true) {
     // Check if pushbutton is pressed
     if ( digitalRead(ROTARY_ENCODER_SW_PIN) ) {
@@ -1361,7 +1359,8 @@ int xSetGenericValue(int init, int min, int max, char *valueName, char *unit) {
         }
       }
       lcd.print( rotaryEncoderVirtualPosition );
-      lcd.print( " *C" );
+      lcd.print( " " );
+      lcd.print( unit );
       lcd.println( "                " );
     }
   }
