@@ -47,7 +47,7 @@
 #define ROTARY_ENCODER_CLK_PIN                    3    // Used for generating interrupts using CLK signal
 #define ROTARY_ENCODER_DT_PIN                     22    // Used for reading DT signal
 #define ROTARY_ENCODER_SW_PIN                     23    // Used for the push button switch
-#define ROTARY_ENCODER_DEBOUNCE_TIME              40    // Number of miliseconds to ignore new signals a signal is received
+#define ROTARY_ENCODER_DEBOUNCE_TIME              20    // Number of miliseconds to ignore new signals a signal is received
 
 // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
 #define SETTING_WELCOME_TIMEOUT                   100
@@ -236,20 +236,10 @@ void isr ()  {    // Interrupt service routine is executed when a HIGH to LOW tr
       // Input of rotary encoder controling generic integer variables within a range between rotaryEncoderMinPosition and rotaryEncoderMaxPosition
       case eRotaryEncoderMode_Generic: {
         if (!digitalRead(ROTARY_ENCODER_DT_PIN)) {
-          if ((interruptTime - lastInterruptTime) < ROTARY_ENCODER_DEBOUNCE_TIME) {
-            rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition + rotaryEncoderMultiStep);
-          }
-          else {
-            rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition + rotaryEncoderSingleStep);
-          }
+          rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition + rotaryEncoderSingleStep);
         }
         else {
-          if ((interruptTime - lastInterruptTime) < ROTARY_ENCODER_DEBOUNCE_TIME) {
-            rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition - rotaryEncoderMultiStep);
-          }
-          else {
-            rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition - rotaryEncoderSingleStep);
-          }
+          rotaryEncoderVirtualPosition = (rotaryEncoderVirtualPosition - rotaryEncoderSingleStep);
         }
         if (rotaryEncoderVirtualPosition > rotaryEncoderMaxPosition) {
             rotaryEncoderVirtualPosition = rotaryEncoderMaxPosition;
@@ -378,7 +368,7 @@ void setup() {
   xSafeHardwarePowerOff           ();
   displayWelcome                  ();
   
-  xSetupRotaryEncoder             ( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+  xSetupRotaryEncoder             ( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
 }
 
 // ######################### START #########################
@@ -492,7 +482,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -502,7 +492,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Presets, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Presets, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -512,7 +502,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Malt, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Malt, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -522,7 +512,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Startpoint, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Startpoint, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -532,7 +522,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_BetaGlucanase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_BetaGlucanase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -542,7 +532,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -552,7 +542,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Proteolytic, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Proteolytic, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -562,7 +552,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_BetaAmylase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_BetaAmylase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -572,7 +562,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_AlphaAmylase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_AlphaAmylase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -582,7 +572,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Mashout, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Mashout, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -592,7 +582,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Recirculation, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Recirculation, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -602,7 +592,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Sparge, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Sparge, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -612,7 +602,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Boil, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Boil, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -622,7 +612,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Hops, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Hops, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -632,7 +622,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Cooling, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Cooling, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -642,7 +632,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -652,7 +642,7 @@ void displayMainMenu() {
       menu_position[0] = -1;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
       
       break;
     }
@@ -752,7 +742,7 @@ void displayMainMenu() {
           }
           default: {
             // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-            xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 1 );
+            xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
           } 
         }
         
