@@ -467,8 +467,8 @@ void displayStatus() {
   lcd.print(cookTemperature);
   
   // Calculate the numbers on the timer clock
-  int minutes = (clockCounter - clockIgnore) / 60;
-  int seconds = (clockCounter - clockIgnore) - minutes * 60;
+  int minutes = clockCounter / 60;
+  int seconds = clockCounter - minutes * 60;
 
   // Position the cursor at the begining of where the timer goes onto the screen
   lcd.setCursor (10, 1);
@@ -900,34 +900,28 @@ void MainMenu_Back() {
 void xCountTheTime( int temperatureRange ) {
   unsigned long now = millis();
 
-#ifdef DEBUG
-  debugPrintFunction("xCountTheTime");
-  debugPrintVar("millis()", now);
-  debugPrintVar("clockStartTime", clockStartTime);
-#endif
-
   // Check if the machine is in the right temperature range, for the current mode,
   if(!(basePT100.getCurrentTemperature() > (cookTemperature - temperatureRange) && basePT100.getCurrentTemperature() < (cookTemperature + temperatureRange))) {
     clockIgnore += now - clockStartTime - clockIgnore;
-
-#ifdef DEBUG
-    debugPrintVar("clockIgnore", clockIgnore);
-#endif
   }
   
   // Calculate the remaining time on the clock
   clockCounter = cookTime - (now - clockStartTime - clockIgnore);
 
 #ifdef DEBUG
-    debugPrintVar("clockCounter", clockCounter);
+  debugPrintFunction("xCountTheTime");
+  debugPrintVar("millis()", now);
+  debugPrintVar("clockStartTime", clockStartTime);
+  debugPrintVar("clockIgnore", clockIgnore);
+  debugPrintVar("clockCounter", clockCounter); 
 #endif
 }
 
 bool isTimeLeft() {
-  if( clockCounter >= cookTime ) {
-    return false;
+  if( clockCounter > 0 ) {
+    return true;
   }
-  return true;
+  return false;
 }
 
 double ulWattToWindowTime( double ulAppliedWatts ) {
