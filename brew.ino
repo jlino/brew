@@ -899,6 +899,7 @@ void MainMenu_Back() {
 
 void xCountTheTime( int temperatureRange ) {
   unsigned long now = millis();
+
 #ifdef DEBUG
   debugPrintFunction("xCountTheTime");
   debugPrintVar("millis()", now);
@@ -907,7 +908,8 @@ void xCountTheTime( int temperatureRange ) {
 
   // Check if the machine is in the right temperature range, for the current mode,
   if(!(basePT100.getCurrentTemperature() > (cookTemperature - temperatureRange) && basePT100.getCurrentTemperature() < (cookTemperature + temperatureRange))) {
-    clockIgnore += now - clockStartTime - clockCounter;
+    clockIgnore += now - clockStartTime - clockIgnore;
+
 #ifdef DEBUG
     debugPrintVar("clockIgnore", clockIgnore);
 #endif
@@ -915,7 +917,8 @@ void xCountTheTime( int temperatureRange ) {
   
   // Calculate the remaining time on the clock
   clockCounter = cookTime - (now - clockStartTime - clockIgnore);
-  #ifdef DEBUG
+
+#ifdef DEBUG
     debugPrintVar("clockCounter", clockCounter);
 #endif
 }
