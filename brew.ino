@@ -13,19 +13,19 @@
 
 // ++++++++++++++++++++++++ Temperature ++++++++++++++++++++++++
 #define PT100_BASE_INPUT_PIN                      A4
-#define PT100_BASE_OUTPUT_PIN                     30
+#define PT100_BASE_OUTPUT_PIN                     32
 #define PT100_BASE_TIME_BETWEEN_READINGS          100
 #define PT100_UP_INPUT_PIN                        A5
-#define PT100_UP_OUTPUT_PIN                       31
+#define PT100_UP_OUTPUT_PIN                       30
 #define PT100_UP_TIME_BETWEEN_READINGS            100
 #define PT100_DOWN_INPUT_PIN                      A6
-#define PT100_DOWN_OUTPUT_PIN                     32
+#define PT100_DOWN_OUTPUT_PIN                     31
 #define PT100_DOWN_TIME_BETWEEN_READINGS          100
 
-#define PT100_BASE_DEFAULT_ADC_VMAX               1.081
-#define PT100_BASE_DEFAULT_VS                     4.87
-#define PT100_BASE_DEFAULT_R1_RESISTENCE          606.0
-#define PT100_BASE_DEFAULT_LINE_RESISTENCE        0.7
+#define PT100_BASE_DEFAULT_ADC_VMAX               1.084
+#define PT100_BASE_DEFAULT_VS                     4.83
+#define PT100_BASE_DEFAULT_R1_RESISTENCE          605.0
+#define PT100_BASE_DEFAULT_LINE_RESISTENCE        1.9 //1.813
 #define PT100_BASE_DEFAULT_OPERATION_RESISTENCE   0.0
 #define PT100_UP_DEFAULT_ADC_VMAX                 1.081
 #define PT100_UP_DEFAULT_VS                       4.87
@@ -297,6 +297,8 @@ void xSafeHardwarePowerOff() {
 
 void displayWelcome() {
   lcdPrint("  Let's start", "    Brewing!");    // Write welcome
+
+  //termometerCalibration();
   delay(SETTING_WELCOME_TIMEOUT);      // pause for effect
 }
 
@@ -925,7 +927,7 @@ void xCountTheTime( int temperatureRange ) {
   // Calculate the remaining time on the clock
   clockCounter = cookTime - (now - clockStartTime - clockIgnore);
 
-#ifdef DEBUG
+#ifdef DEBUG_OFF
   debugPrintFunction("xCountTheTime");
   debugPrintVar("millis()", now);
   debugPrintVar("clockStartTime", clockStartTime);
@@ -1001,6 +1003,19 @@ bool xRegulateTemperature() {
 
 bool xRegulatePumpSpeed() {
   analogWrite(PUMP_PIN, iPumpSpeed);  // analogWrite values from 0 to 255
+
+  if( iPumpSpeed ) {
+    //basePT100.setPower( PT100_BASE_DARLINGTON_ADC_VMAX, PT100_BASE_DARLINGTON_VS );
+    basePT100.setMeasuredTemperatureDeviation( -4.41 );
+    upPT100.setMeasuredTemperatureDeviation( -4.41 );
+    downPT100.setMeasuredTemperatureDeviation( -4.41 );
+  }
+  else {
+    //basePT100.setPower( PT100_BASE_DEFAULT_ADC_VMAX, PT100_BASE_DEFAULT_VS );
+    basePT100.setMeasuredTemperatureDeviation( 0.0 );
+    upPT100.setMeasuredTemperatureDeviation( 0.0 );
+    downPT100.setMeasuredTemperatureDeviation( 0.0 );
+  }
 }
 
 void xWarnClockEnded() {
@@ -1054,7 +1069,8 @@ void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemp
       return;
     } else {
       // Set the clock, target temperature and Reset the clock
-      xStageFirstRun( iStageTime, iStageTemperature, PUMP_SPEED_SLOW );
+      //xStageFirstRun( iStageTime, iStageTemperature, PUMP_SPEED_SLOW );
+      xStageFirstRun( iStageTime, iStageTemperature, 255 );
     }
   } else {
     // Account for time spent at the target temperature | Input 1: range in ºC within which the target temperature is considered to be reached
@@ -1086,9 +1102,12 @@ void xWarnCookEnded() {
 void operateMachine() {
 
   // Measure temperature, for effect
+  //analogWrite(6, 0);
+  //delay(1);
   basePT100.measure();
   upPT100.measure();
   downPT100.measure();
+  //analogWrite(6, iPumpSpeed);
 
   // If cooking is done, return (this is a nice place to double check safety and ensure the cooking parts aren't on.
   if(!cooking) {
