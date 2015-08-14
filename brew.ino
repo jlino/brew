@@ -43,6 +43,10 @@
 //#define MIXER_MAX_POSITION   255
 
 // ++++++++++++++++++++++++ Pump ++++++++++++++++++++++++
+#include "Melody.h"
+#define PIEZO_PIN                                 25
+
+// ++++++++++++++++++++++++ Pump ++++++++++++++++++++++++
 #define PUMP_PIN                                  6
 #define PUMP_SPEED_STOP                           0
 #define PUMP_SPEED_SLOW                           64
@@ -191,15 +195,6 @@ PT100                   upPT100(PT100_UP_OUTPUT_PIN, PT100_UP_INPUT_PIN, PT100_U
 PT100                   downPT100(PT100_DOWN_OUTPUT_PIN, PT100_DOWN_INPUT_PIN, PT100_DOWN_TIME_BETWEEN_READINGS, PT100_DOWN_DEFAULT_ADC_VMAX, PT100_DOWN_DEFAULT_VS, PT100_DOWN_DEFAULT_R1_RESISTENCE, PT100_DOWN_DEFAULT_LINE_RESISTENCE, PT100_DOWN_DEFAULT_OPERATION_RESISTENCE);
 
 // ######################### INTERRUPTS #########################
-void xSetupRotaryEncoder( eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep ) {
-  if( newMode >= 0 ) rotaryEncoderMode = newMode;
-  if( newPosition >= 0 ) rotaryEncoderVirtualPosition = newPosition;
-  if( newMaxPosition >= 0 ) rotaryEncoderMaxPosition = newMaxPosition;
-  if( newMinPosition >= 0 ) rotaryEncoderMinPosition = newMinPosition;
-  if( newSingleStep >= 0 ) rotaryEncoderSingleStep = newSingleStep;
-  if( newMultiStep >= 0 ) rotaryEncoderMultiStep = newMultiStep;
-}
-
 void isr ()  {    // Interrupt service routine is executed when a HIGH to LOW transition is detected on CLK
   unsigned long interruptTime = millis();
   unsigned long diff = interruptTime - lastInterruptTime;
@@ -287,6 +282,15 @@ void isr ()  {    // Interrupt service routine is executed when a HIGH to LOW tr
   refresh = true;
 }
 
+void xSetupRotaryEncoder( eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep ) {
+  if( newMode >= 0 ) rotaryEncoderMode = newMode;
+  if( newPosition >= 0 ) rotaryEncoderVirtualPosition = newPosition;
+  if( newMaxPosition >= 0 ) rotaryEncoderMaxPosition = newMaxPosition;
+  if( newMinPosition >= 0 ) rotaryEncoderMinPosition = newMinPosition;
+  if( newSingleStep >= 0 ) rotaryEncoderSingleStep = newSingleStep;
+  if( newMultiStep >= 0 ) rotaryEncoderMultiStep = newMultiStep;
+}
+
 // ######################### START #########################
 void xSafeHardwarePowerOff() {
 //  analogWrite(MIXER_PIN, 0);        // Turn mixer OFF for safety
@@ -297,6 +301,9 @@ void xSafeHardwarePowerOff() {
 
 void displayWelcome() {
   lcdPrint("  Let's start", "    Brewing!");    // Write welcome
+
+  // Play Melody;
+  sing(MELODY_SUPER_MARIO_START, PIEZO_PIN);
 
   //termometerCalibration();
   delay(SETTING_WELCOME_TIMEOUT);      // pause for effect
@@ -323,6 +330,9 @@ void setup() {
   pinMode(PUMP_PIN, OUTPUT);   // sets the pin as output
   iPumpSpeed                  =   PUMP_SPEED_STOP;             // Time frame to operate in
   analogWrite(PUMP_PIN, iPumpSpeed);  // analogWrite values from 0 to 255
+
+  // ++++++++++++++++++++++++ Pump ++++++++++++++++++++++++
+  pinMode(PIEZO_PIN, OUTPUT);
 
   // ++++++++++++++++++++++++ Temperature Sensor PT100 ++++++++++++++++++++++++
   //basePT100.setup();
@@ -406,7 +416,7 @@ void setup() {
   xSetupRotaryEncoder             ( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
 }
 
-// ######################### START #########################
+// ######################### MAIN LOOP #########################
 
 void loop() {
   unsigned long inactivityTime = millis() - lastInterruptTime;
@@ -424,6 +434,8 @@ void loop() {
   
   operateMachine();
 }
+
+// ######################### FUNCTIONS ########################
 
 void xPaintStatusTemplate() {
   // Clear LCD
@@ -1019,7 +1031,7 @@ bool xRegulatePumpSpeed() {
 }
 
 void xWarnClockEnded() {
-  /// TODO
+  sing(MELODY_SUPER_MARIO_START, PIEZO_PIN);
 }
 
 void xStageFirstRun( int stageTime, int stageTemperature, int stagePumpSpeed ) {
