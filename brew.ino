@@ -22,20 +22,20 @@
 #define PT100_DOWN_OUTPUT_PIN                     31
 #define PT100_DOWN_TIME_BETWEEN_READINGS          100
 
-#define PT100_BASE_DEFAULT_ADC_VMAX               1.084
-#define PT100_BASE_DEFAULT_VS                     4.83
-#define PT100_BASE_DEFAULT_R1_RESISTENCE          605.0
-#define PT100_BASE_DEFAULT_LINE_RESISTENCE        1.9 //1.813
+#define PT100_BASE_DEFAULT_ADC_VMAX               1.1
+#define PT100_BASE_DEFAULT_VS                     5.0
+#define PT100_BASE_DEFAULT_R1_RESISTENCE          608.99
+#define PT100_BASE_DEFAULT_LINE_RESISTENCE        0.5408314 
 #define PT100_BASE_DEFAULT_OPERATION_RESISTENCE   0.0
-#define PT100_UP_DEFAULT_ADC_VMAX                 1.081
-#define PT100_UP_DEFAULT_VS                       4.87
-#define PT100_UP_DEFAULT_R1_RESISTENCE            606.0
-#define PT100_UP_DEFAULT_LINE_RESISTENCE          0.7
+#define PT100_UP_DEFAULT_ADC_VMAX                 1.1
+#define PT100_UP_DEFAULT_VS                       5.0
+#define PT100_UP_DEFAULT_R1_RESISTENCE            608.95
+#define PT100_UP_DEFAULT_LINE_RESISTENCE          0.5408314
 #define PT100_UP_DEFAULT_OPERATION_RESISTENCE     0.0
-#define PT100_DOWN_DEFAULT_ADC_VMAX               1.081
-#define PT100_DOWN_DEFAULT_VS                     4.87
-#define PT100_DOWN_DEFAULT_R1_RESISTENCE          606.0
-#define PT100_DOWN_DEFAULT_LINE_RESISTENCE        0.7
+#define PT100_DOWN_DEFAULT_ADC_VMAX               1.1
+#define PT100_DOWN_DEFAULT_VS                     5.0
+#define PT100_DOWN_DEFAULT_R1_RESISTENCE          608.95
+#define PT100_DOWN_DEFAULT_LINE_RESISTENCE        0.5408314
 #define PT100_DOWN_DEFAULT_OPERATION_RESISTENCE   0.0
 
 // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
@@ -190,9 +190,9 @@ int                     iPumpSpeed;             // Time frame to operate in
 LiquidCrystal_I2C       lcd(LCD_I2C_ADDR, LCD_EN_PIN, LCD_RW_PIN, LCD_RS_PIN, LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
 
 // +++++++++++++++++++++++ PT100 +++++++++++++++++++++++
-PT100                   basePT100(PT100_BASE_OUTPUT_PIN, PT100_BASE_INPUT_PIN, PT100_BASE_TIME_BETWEEN_READINGS, PT100_BASE_DEFAULT_ADC_VMAX, PT100_BASE_DEFAULT_VS, PT100_BASE_DEFAULT_R1_RESISTENCE, PT100_BASE_DEFAULT_LINE_RESISTENCE, PT100_BASE_DEFAULT_OPERATION_RESISTENCE);
-PT100                   upPT100(PT100_UP_OUTPUT_PIN, PT100_UP_INPUT_PIN, PT100_UP_TIME_BETWEEN_READINGS, PT100_UP_DEFAULT_ADC_VMAX, PT100_UP_DEFAULT_VS, PT100_UP_DEFAULT_R1_RESISTENCE, PT100_UP_DEFAULT_LINE_RESISTENCE, PT100_UP_DEFAULT_OPERATION_RESISTENCE);
-PT100                   downPT100(PT100_DOWN_OUTPUT_PIN, PT100_DOWN_INPUT_PIN, PT100_DOWN_TIME_BETWEEN_READINGS, PT100_DOWN_DEFAULT_ADC_VMAX, PT100_DOWN_DEFAULT_VS, PT100_DOWN_DEFAULT_R1_RESISTENCE, PT100_DOWN_DEFAULT_LINE_RESISTENCE, PT100_DOWN_DEFAULT_OPERATION_RESISTENCE);
+PT100                   basePT100("base", PT100_BASE_OUTPUT_PIN, PT100_BASE_INPUT_PIN, PT100_BASE_TIME_BETWEEN_READINGS, PT100_BASE_DEFAULT_ADC_VMAX, PT100_BASE_DEFAULT_VS, PT100_BASE_DEFAULT_R1_RESISTENCE, PT100_BASE_DEFAULT_LINE_RESISTENCE, PT100_BASE_DEFAULT_OPERATION_RESISTENCE);
+PT100                   upPT100("up", PT100_UP_OUTPUT_PIN, PT100_UP_INPUT_PIN, PT100_UP_TIME_BETWEEN_READINGS, PT100_UP_DEFAULT_ADC_VMAX, PT100_UP_DEFAULT_VS, PT100_UP_DEFAULT_R1_RESISTENCE, PT100_UP_DEFAULT_LINE_RESISTENCE, PT100_UP_DEFAULT_OPERATION_RESISTENCE);
+PT100                   downPT100("down", PT100_DOWN_OUTPUT_PIN, PT100_DOWN_INPUT_PIN, PT100_DOWN_TIME_BETWEEN_READINGS, PT100_DOWN_DEFAULT_ADC_VMAX, PT100_DOWN_DEFAULT_VS, PT100_DOWN_DEFAULT_R1_RESISTENCE, PT100_DOWN_DEFAULT_LINE_RESISTENCE, PT100_DOWN_DEFAULT_OPERATION_RESISTENCE);
 
 // ######################### INTERRUPTS #########################
 void isr ()  {    // Interrupt service routine is executed when a HIGH to LOW transition is detected on CLK
@@ -293,13 +293,19 @@ void xSetupRotaryEncoder( eRotaryEncoderMode newMode, int newPosition, int newMa
 
 // ######################### START #########################
 void xSafeHardwarePowerOff() {
-//  analogWrite(MIXER_PIN, 0);        // Turn mixer OFF for safety
+  // Turn off gracefully
+  iPumpSpeed = PUMP_SPEED_STOP;
+  xRegulatePumpSpeed();
+
+  // Force shutdown
   analogWrite(PUMP_PIN, PUMP_SPEED_STOP);  // analogWrite values from 0 to 255
   digitalWrite(HEATING_ELEMENT_OUTPUT_PIN, LOW);  // Turn heading element OFF for safety
-  //basePT100.xSafeHardwarePowerOff();                  // Turn temperature sensor OFF for safety
+
+//analogWrite(MIXER_PIN, 0);        // Turn mixer OFF for safety
 }
 
 void displayWelcome() {
+#ifndef DEBUG
   lcdPrint("  Let's start", "    Brewing!");    // Write welcome
 
   // Play Melody;
@@ -307,6 +313,7 @@ void displayWelcome() {
 
   //termometerCalibration();
   delay(SETTING_WELCOME_TIMEOUT);      // pause for effect
+#endif
 }
 
 void setup() {
@@ -468,7 +475,7 @@ void displayStatus() {
     // Reset the repaint flag after the repaint has been done
     repaint = false;
   }
-  
+
   // Print positions with no numbers, before the measured temperature value
   lcd.setCursor (3,0);
   if (basePT100.getCurrentTemperature() < 10) {
@@ -525,6 +532,16 @@ void displayMainMenu() {
   switch(menu_position[0]) {
     case eMainMenu_GO: {
       MainMenu_GO();
+      
+      menu_position[0] = -1;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
+      
+      break;
+    }
+    case eMainMenu_STOP: {
+      MainMenu_STOP();
       
       menu_position[0] = -1;
       
@@ -673,6 +690,16 @@ void displayMainMenu() {
       
       break;
     }
+    case eMainMenu_Purge: {
+      MainMenu_Purge();
+
+      menu_position[0] = -1;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Purge, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
+      
+      break;
+    }
     case eMainMenu_Settings: {
       MainMenu_Settings();
       
@@ -685,12 +712,12 @@ void displayMainMenu() {
     }
     case eMainMenu_Back: {
       MainMenu_Back();
-      
+        
       menu_position[0] = -1;
-      
+        
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Back, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
+
       break;
     }
     default: {
@@ -705,6 +732,11 @@ void displayMainMenu() {
           case eMainMenu_GO: {
             lcd.setCursor (0,1);        // go to start of 2nd line
             lcd.print("-> GO           ");
+            break;
+          }
+          case eMainMenu_STOP: {
+            lcd.setCursor (0,1);        // go to start of 2nd line
+            lcd.print("-> STOP         ");
             break;
           }
           case eMainMenu_Presets: {
@@ -777,6 +809,11 @@ void displayMainMenu() {
             lcd.print("-> Cooling      ");
             break;
           }
+          case eMainMenu_Purge: {
+            lcd.setCursor (0,1);        // go to start of 2nd line
+            lcd.print("-> Purge        ");
+            break;
+          }
           case eMainMenu_Settings: {
             lcd.setCursor (0,1);        // go to start of 2nd line
             lcd.print("-> Settings     ");
@@ -808,6 +845,14 @@ void displayMainMenu() {
 
 void MainMenu_GO() {
   startBrewing();
+
+  xTransitionIntoStage_GlobalVariables( eCookingStage_Startpoint );
+
+  backToStatus();
+}
+
+void MainMenu_STOP() {
+  stopBrewing();
 
   backToStatus();
 }
@@ -918,6 +963,17 @@ void MainMenu_Cooling() {
   backToStatus();
 }
 
+void MainMenu_Purge() {
+  // Stop anything that might be still going on
+  xSafeHardwarePowerOff();
+
+  // Start at the Purge stage
+  startBrewing();
+  xTransitionIntoStage_GlobalVariables( eCookingStage_Purge );
+
+  backToStatus();
+}
+
 void MainMenu_Settings() {
   iPumpSpeed = xSetGenericValue( iPumpSpeed, 0, 255, "Pump Speed", "PWM" );
 
@@ -1018,9 +1074,9 @@ bool xRegulatePumpSpeed() {
 
   if( iPumpSpeed ) {
     //basePT100.setPower( PT100_BASE_DARLINGTON_ADC_VMAX, PT100_BASE_DARLINGTON_VS );
-    basePT100.setMeasuredTemperatureDeviation( -4.41 );
-    upPT100.setMeasuredTemperatureDeviation( -4.41 );
-    downPT100.setMeasuredTemperatureDeviation( -4.41 );
+    basePT100.setMeasuredTemperatureDeviation( -1.00 );
+    upPT100.setMeasuredTemperatureDeviation( -1.00 );
+    downPT100.setMeasuredTemperatureDeviation( -1.00 );
   }
   else {
     //basePT100.setPower( PT100_BASE_DEFAULT_ADC_VMAX, PT100_BASE_DEFAULT_VS );
@@ -1108,7 +1164,7 @@ void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemp
 }
 
 void xWarnCookEnded() {
-  /// TODO
+  sing(MELODY_UNDERWORLD, PIEZO_PIN);
 }
 
 void operateMachine() {
@@ -1124,7 +1180,7 @@ void operateMachine() {
   // If cooking is done, return (this is a nice place to double check safety and ensure the cooking parts aren't on.
   if(!cooking) {
     xSafeHardwarePowerOff();
-    
+
     return;
   }
   
@@ -1134,77 +1190,75 @@ void operateMachine() {
       // A basic operation for a basic stage
       xBasicStageOperation( startpointTime, startpointTemperature, 1, eCookingStage_BetaGlucanase );
       
-      // There is nothing to do, in this iteration
       break;
     }
     case eCookingStage_BetaGlucanase: {
       // A basic operation for a basic stage
       xBasicStageOperation( betaGlucanaseTime, betaGlucanaseTemperature, 1, eCookingStage_Debranching );
       
-      // There is nothing to do, in this iteration
       break;
     }
     case eCookingStage_Debranching: {
       // A basic operation for a basic stage
       xBasicStageOperation( debranchingTime, debranchingTemperature, 1, eCookingStage_Proteolytic );
       
-      // There is nothing to do, in this iteration
       break;
     }
     case eCookingStage_Proteolytic: {
       // A basic operation for a basic stage
       xBasicStageOperation( proteolyticTime, proteolyticTemperature, 1, eCookingStage_BetaAmylase );
       
-      // There is nothing to do, in this iteration
       break;
     }
     case eCookingStage_BetaAmylase: {
       // A basic operation for a basic stage
       xBasicStageOperation( betaAmylaseTime, betaAmylaseTemperature, 1, eCookingStage_AlphaAmylase );
       
-      // There is nothing to do, in this iteration
       break;
     }
     case eCookingStage_AlphaAmylase: {
       // A basic operation for a basic stage
       xBasicStageOperation( alphaAmylaseTime, alphaAmylaseTemperature, 1, eCookingStage_Mashout );
       
-      // There is nothing to do, in this iteration
       break;
     }
     case eCookingStage_Mashout: {
       // A basic operation for a basic stage
       xBasicStageOperation( mashoutTime, mashoutTemperature, 1, eCookingStage_Recirculation );
       
-      // There is nothing to do, in this iteration
       break;
     }
     case eCookingStage_Recirculation: {
       // A basic operation for a basic stage
       xBasicStageOperation( recirculationTime, recirculationTemperature, 1, eCookingStage_Sparge );
       
-      // There is nothing to do, in this iteration
       break;
     }
     case eCookingStage_Sparge: {
       // A basic operation for a basic stage
       xBasicStageOperation( spargeTime, spargeTemperature, 1, eCookingStage_Boil );
       
-      // There is nothing to do, in this iteration
       break;
     }
     case eCookingStage_Boil: {
       // A basic operation for a basic stage
       xBasicStageOperation( boilTime, boilTemperature, 1, eCookingStage_Cooling );
       
-      // There is nothing to do, in this iteration
       break;
     }
     case eCookingStage_Cooling: {
       // A basic operation for a basic stage
       xBasicStageOperation( coolingTime, coolingTemperature, 1, eCookingStage_Done );
-      
-      // There is nothing to do, in this iteration
+
+      break;
+    }
+    case eCookingStage_Purge: {
+      // A basic operation for a basic stage
+      //xBasicStageOperation( coolingTime, coolingTemperature, 1, eCookingStage_Done );
+      iPumpSpeed = PUMP_SPEED_MAX;
+
+      xRegulatePumpSpeed();
+
       break;
     }
     default : {
@@ -1220,6 +1274,8 @@ void operateMachine() {
 // #################################################### Helpers ##################################################################
 
 void startBrewing() {
+  //sing(MELODY_SUPER_MARIO, PIEZO_PIN);
+
   cooking = true;
 }
 
