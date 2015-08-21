@@ -29,12 +29,12 @@
 #define PT100_BASE_DEFAULT_OPERATION_RESISTENCE   0.0
 #define PT100_UP_DEFAULT_ADC_VMAX                 1.1
 #define PT100_UP_DEFAULT_VS                       5.0
-#define PT100_UP_DEFAULT_R1_RESISTENCE            608.95
+#define PT100_UP_DEFAULT_R1_RESISTENCE            615.0
 #define PT100_UP_DEFAULT_LINE_RESISTENCE          0.5408314
 #define PT100_UP_DEFAULT_OPERATION_RESISTENCE     0.0
 #define PT100_DOWN_DEFAULT_ADC_VMAX               1.1
 #define PT100_DOWN_DEFAULT_VS                     5.0
-#define PT100_DOWN_DEFAULT_R1_RESISTENCE          608.95
+#define PT100_DOWN_DEFAULT_R1_RESISTENCE          617.2
 #define PT100_DOWN_DEFAULT_LINE_RESISTENCE        0.5408314
 #define PT100_DOWN_DEFAULT_OPERATION_RESISTENCE   0.0
 
@@ -453,10 +453,10 @@ void xPaintStatusTemplate() {
 
   // Print the target and measured temperature template
   if(cooking) {
-    lcd.print("ON : 000*C/000*C");
+    lcd.print("ON  XX 000.0/000C");
   }
   else {
-    lcd.print("OFF: 000*C/000*C");
+    lcd.print("OFF XX 000.0/000C");
   }
 
   // Position the cursor at the begining of where the mode and time template goes onto the screen
@@ -475,23 +475,45 @@ void displayStatus() {
     // Reset the repaint flag after the repaint has been done
     repaint = false;
   }
+  
+  double displayTemperature = 0.0;
+  unsigned long ulTimeToShow = millis() % 6000;
+
+  lcd.setCursor (4,0);
+  if(ulTimeToShow < 2000) {
+    displayTemperature = basePT100.getCurrentTemperature();
+
+    lcd.print("TS");
+  }
+  else {
+    if(ulTimeToShow < 4000) {
+      displayTemperature = upPT100.getCurrentTemperature();
+
+      lcd.print("UP");
+    }
+    else {
+      displayTemperature = downPT100.getCurrentTemperature();
+
+      lcd.print("DW");
+    }
+  }
 
   // Print positions with no numbers, before the measured temperature value
-  lcd.setCursor (3,0);
-  if (basePT100.getCurrentTemperature() < 10) {
+  lcd.setCursor (7,0);
+  if (displayTemperature < 10) {
     lcd.print("  ");
   }
   else {
-    if (basePT100.getCurrentTemperature() < 100) {
+    if (displayTemperature < 100) {
       lcd.print(" ");
     }
   }
 
   // Print measured temperature value onto the LCD
-  lcd.print(basePT100.getCurrentTemperature(), 1);
+  lcd.print(displayTemperature, 1);
 
   // Print positions with no numbers, before the target temperature value
-  lcd.setCursor (11,0);
+  lcd.setCursor (13,0);
   if (cookTemperature < 10) {
     lcd.print("  ");
   }
