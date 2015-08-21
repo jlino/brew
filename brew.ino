@@ -29,7 +29,7 @@
 #define PT100_BASE_DEFAULT_OPERATION_RESISTENCE   0.0
 #define PT100_UP_DEFAULT_ADC_VMAX                 1.1
 #define PT100_UP_DEFAULT_VS                       5.0
-#define PT100_UP_DEFAULT_R1_RESISTENCE            615.0
+#define PT100_UP_DEFAULT_R1_RESISTENCE            618.1
 #define PT100_UP_DEFAULT_LINE_RESISTENCE          0.5408314
 #define PT100_UP_DEFAULT_OPERATION_RESISTENCE     0.0
 #define PT100_DOWN_DEFAULT_ADC_VMAX               1.1
@@ -123,29 +123,29 @@ eCookingStages          cookingStage;
 boolean                 cooking;
 boolean                 bStageFirstRun;
 
-int                     clockStartTime;
-int                     clockCounter;
-int                     clockIgnore;
+unsigned long                     clockStartTime;
+unsigned long                     clockCounter;
+unsigned long                     clockIgnore;
 boolean                 clockStart;
 boolean                 clockEnd;
 
-int                     cookTime;
+unsigned long                     cookTime;
 int                     cookTemperature;
 //cook_mode_list        cookMode;
 //int                   cookMixerSpeed;
 int                     cookHeatPWM;
         
-int                     startpointTime;
-int                     betaGlucanaseTime;
-int                     debranchingTime;
-int                     proteolyticTime;
-int                     betaAmylaseTime;
-int                     alphaAmylaseTime;
-int                     mashoutTime;
-int                     recirculationTime;
-int                     spargeTime;
-int                     boilTime;
-int                     coolingTime;
+unsigned long                     startpointTime;
+unsigned long                     betaGlucanaseTime;
+unsigned long                     debranchingTime;
+unsigned long                     proteolyticTime;
+unsigned long                     betaAmylaseTime;
+unsigned long                     alphaAmylaseTime;
+unsigned long                     mashoutTime;
+unsigned long                     recirculationTime;
+unsigned long                     spargeTime;
+unsigned long                     boilTime;
+unsigned long                     coolingTime;
         
 int                     startpointTemperature;
 int                     betaGlucanaseTemperature;
@@ -383,7 +383,7 @@ void setup() {
   //cookMixerSpeed            =   120;
   cookHeatPWM                 =   5;
 
-  startpointTime              =   120;
+  startpointTime              =   3600; //120;
   betaGlucanaseTime           =   0;
   debranchingTime             =   0;
   proteolyticTime             =   0;
@@ -395,7 +395,7 @@ void setup() {
   boilTime                    =   5400;
   coolingTime                 =   120;
 
-  startpointTemperature       =   30;
+  startpointTemperature       =   33; //30;
   betaGlucanaseTemperature    =   40;
   debranchingTemperature      =   40;
   proteolyticTemperature      =   50;
@@ -527,8 +527,8 @@ void displayStatus() {
   lcd.print(cookTemperature);
   
   // Calculate the numbers on the timer clock
-  int minutes = clockCounter / 60;
-  int seconds = clockCounter - minutes * 60;
+  unsigned long minutes = clockCounter / 1000 / 60;
+  unsigned long seconds = (clockCounter / 1000) % 60;
 
   // Position the cursor at the begining of where the timer goes onto the screen
   lcd.setCursor (10, 1);
@@ -1015,11 +1015,12 @@ void xCountTheTime( int temperatureRange ) {
   }
   
   // Calculate the remaining time on the clock
-  clockCounter = cookTime - (now - clockStartTime - clockIgnore);
+  clockCounter = cookTime * 1000 - (now - clockStartTime - clockIgnore);
 
-#ifdef DEBUG_OFF
+#ifdef DEBUG
   debugPrintFunction("xCountTheTime");
   debugPrintVar("millis()", now);
+  debugPrintVar("cookTime", cookTime);
   debugPrintVar("clockStartTime", clockStartTime);
   debugPrintVar("clockIgnore", clockIgnore);
   debugPrintVar("clockCounter", clockCounter); 
@@ -1086,12 +1087,12 @@ bool xRegulateTemperature() {
   
   // Apply wattage to the element at the right time
   if( ulWattToWindowTime( wattage ) > (millis() - windowStartTime) ) {
-    digitalWrite(HEATING_ELEMENT_OUTPUT_PIN,HIGH);
+    //digitalWrite(HEATING_ELEMENT_OUTPUT_PIN,HIGH);
   } else {
     digitalWrite(HEATING_ELEMENT_OUTPUT_PIN,LOW);
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_OFF
   debugPrintFunction("xRegulateTemperature");
   debugPrintVar("difference", difference);
   debugPrintVar("overTemperature", overTemperature);
@@ -1124,7 +1125,11 @@ void xWarnClockEnded() {
   sing(MELODY_SUPER_MARIO_START, PIEZO_PIN);
 }
 
-void xStageFirstRun( int stageTime, int stageTemperature, int stagePumpSpeed ) {
+void xStageFirstRun( int stageTime, int stageTemperature, int stagePumpSpeed, eCookingStages stage ) {
+  // Set Stage
+  bStageFirstRun = true;
+  cookingStage = stage;
+
   // Set the clock
   cookTime = stageTime;
   
@@ -1140,9 +1145,94 @@ void xStageFirstRun( int stageTime, int stageTemperature, int stagePumpSpeed ) {
 }
 
 void xTransitionIntoStage_GlobalVariables(eCookingStages nextStage) {
-  // Reset global stage variables
-  bStageFirstRun = true;
-  cookingStage = nextStage;
+
+  // Operate the machine according to the current mode
+  switch(nextStage) {
+    case eCookingStage_Startpoint: {
+      // A basic operation for a basic stage
+      xStageFirstRun( startpointTime, startpointTemperature, 255, eCookingStage_Startpoint );
+      
+      break;
+    }
+    case eCookingStage_BetaGlucanase: {
+      // A basic operation for a basic stage
+      xStageFirstRun( betaGlucanaseTime, betaGlucanaseTemperature, 255, eCookingStage_BetaGlucanase );
+      
+      break;
+    }
+    case eCookingStage_Debranching: {
+      // A basic operation for a basic stage
+      xStageFirstRun( debranchingTime, debranchingTemperature, 255, eCookingStage_Debranching );
+      
+      break;
+    }
+    case eCookingStage_Proteolytic: {
+      // A basic operation for a basic stage
+      xStageFirstRun( proteolyticTime, proteolyticTemperature, 255, eCookingStage_Proteolytic );
+      
+      break;
+    }
+    case eCookingStage_BetaAmylase: {
+      // A basic operation for a basic stage
+      xStageFirstRun( betaAmylaseTime, betaAmylaseTemperature, 255, eCookingStage_BetaAmylase );
+      
+      break;
+    }
+    case eCookingStage_AlphaAmylase: {
+      // A basic operation for a basic stage
+      xStageFirstRun( alphaAmylaseTime, alphaAmylaseTemperature, 255, eCookingStage_AlphaAmylase );
+      
+      break;
+    }
+    case eCookingStage_Mashout: {
+      // A basic operation for a basic stage
+      xStageFirstRun( mashoutTime, mashoutTemperature, 255, eCookingStage_Mashout );
+      
+      break;
+    }
+    case eCookingStage_Recirculation: {
+      // A basic operation for a basic stage
+      xStageFirstRun( recirculationTime, recirculationTemperature, 255, eCookingStage_Recirculation );
+      
+      break;
+    }
+    case eCookingStage_Sparge: {
+      // A basic operation for a basic stage
+      xStageFirstRun( spargeTime, spargeTemperature, 255, eCookingStage_Sparge );
+      
+      break;
+    }
+    case eCookingStage_Boil: {
+      // A basic operation for a basic stage
+      xStageFirstRun( boilTime, boilTemperature, 255, eCookingStage_Boil );
+      
+      break;
+    }
+    case eCookingStage_Cooling: {
+      // A basic operation for a basic stage
+      xStageFirstRun( coolingTime, coolingTemperature, 255, eCookingStage_Cooling );
+
+      break;
+    }
+    case eCookingStage_Purge: {
+      // A basic operation for a basic stage
+      xStageFirstRun( 0, 0, 255, eCookingStage_Purge );
+
+      xRegulatePumpSpeed();
+
+      break;
+    }
+    case eCookingStage_Done: {
+      // A basic operation for a basic stage
+      xStageFirstRun( 0, 0, 0, eCookingStage_Done );
+
+      break;
+    }
+    default : {
+      // A basic operation for a basic stage
+      xStageFirstRun( 0, 0, 0, eCookingStage_Done );
+    }
+  }
 }
 
 void xTransitionIntoStage(eCookingStages nextStage) {
@@ -1161,18 +1251,20 @@ void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemp
   if(bStageFirstRun) {
     // Don't run this again
     bStageFirstRun = false;
+
+    //xStageFirstRun( iStageTime, iStageTemperature, 255 );
     
     // When the stage should be skipped
     if( iStageTime == 0) {
       // Continue to the next stage
-      xTransitionIntoStage_GlobalVariables( nextStage );
+      //xTransitionIntoStage_GlobalVariables( nextStage );
       
       // There is nothing to do, in this stage
       return;
     } else {
       // Set the clock, target temperature and Reset the clock
       //xStageFirstRun( iStageTime, iStageTemperature, PUMP_SPEED_SLOW );
-      xStageFirstRun( iStageTime, iStageTemperature, 255 );
+      //xStageFirstRun( iStageTime, iStageTemperature, 255 );
     }
   } else {
     // Account for time spent at the target temperature | Input 1: range in ºC within which the target temperature is considered to be reached
