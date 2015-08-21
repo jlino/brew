@@ -395,7 +395,7 @@ void setup() {
   boilTime                    =   5400;
   coolingTime                 =   120;
 
-  startpointTemperature       =   45;
+  startpointTemperature       =   30;
   betaGlucanaseTemperature    =   40;
   debranchingTemperature      =   40;
   proteolyticTemperature      =   50;
@@ -1033,13 +1033,14 @@ bool isTimeLeft() {
   return false;
 }
 
+//HEATING_ELEMENT_MAX_WATTAGE / HEATING_ELEMENT_AC_FREQUENCY_HZ
 double ulWattToWindowTime( double ulAppliedWatts ) {
   double ulPulsesRequired = ulAppliedWatts / dWattPerPulse;
-  return (double)iWindowSize / 1000.0 * ulPulsesRequired;
+  return (double)iWindowSize / 1000.0 * ulPulsesRequired * 1000.0 / HEATING_ELEMENT_AC_FREQUENCY_HZ;
 }
 
 bool xRegulateTemperature() {
-  double difference = basePT100.getCurrentTemperature() - cookTemperature;
+  double difference = cookTemperature - basePT100.getCurrentTemperature();
   bool overTemperature = false;
   double wattage = 0.0;
   
@@ -1084,11 +1085,22 @@ bool xRegulateTemperature() {
   }
   
   // Apply wattage to the element at the right time
-  if( ulWattToWindowTime( wattage ) > (millis() - windowStartTime)) {
+  if( ulWattToWindowTime( wattage ) > (millis() - windowStartTime) ) {
     digitalWrite(HEATING_ELEMENT_OUTPUT_PIN,HIGH);
   } else {
     digitalWrite(HEATING_ELEMENT_OUTPUT_PIN,LOW);
   }
+
+#ifdef DEBUG
+  debugPrintFunction("xRegulateTemperature");
+  debugPrintVar("difference", difference);
+  debugPrintVar("overTemperature", overTemperature);
+  debugPrintVar("wattage", wattage);
+  debugPrintVar("ulWattToWindowTime( wattage )", ulWattToWindowTime( wattage ) );
+  debugPrintVar("millis()", millis());
+  debugPrintVar("windowStartTime", windowStartTime);
+  debugPrintVar("test", ulWattToWindowTime( wattage ) > (millis() - windowStartTime) ); 
+#endif
 }
 
 bool xRegulatePumpSpeed() {
