@@ -24,18 +24,18 @@
 
 #define PT100_BASE_DEFAULT_ADC_VMAX               1.1
 #define PT100_BASE_DEFAULT_VS                     5.0
-#define PT100_BASE_DEFAULT_R1_RESISTENCE          608.99
-#define PT100_BASE_DEFAULT_LINE_RESISTENCE        0.5408314 
+#define PT100_BASE_DEFAULT_R1_RESISTENCE          605.2 //608.99
+#define PT100_BASE_DEFAULT_LINE_RESISTENCE        0.0
 #define PT100_BASE_DEFAULT_OPERATION_RESISTENCE   0.0
 #define PT100_UP_DEFAULT_ADC_VMAX                 1.1
 #define PT100_UP_DEFAULT_VS                       5.0
-#define PT100_UP_DEFAULT_R1_RESISTENCE            618.1
-#define PT100_UP_DEFAULT_LINE_RESISTENCE          0.5408314
+#define PT100_UP_DEFAULT_R1_RESISTENCE            615.6 //621 //620 //618.1
+#define PT100_UP_DEFAULT_LINE_RESISTENCE          0.0
 #define PT100_UP_DEFAULT_OPERATION_RESISTENCE     0.0
 #define PT100_DOWN_DEFAULT_ADC_VMAX               1.1
 #define PT100_DOWN_DEFAULT_VS                     5.0
-#define PT100_DOWN_DEFAULT_R1_RESISTENCE          617.2
-#define PT100_DOWN_DEFAULT_LINE_RESISTENCE        0.5408314
+#define PT100_DOWN_DEFAULT_R1_RESISTENCE          618.6 //619.3 //617.2
+#define PT100_DOWN_DEFAULT_LINE_RESISTENCE        0.0
 #define PT100_DOWN_DEFAULT_OPERATION_RESISTENCE   0.0
 
 // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
@@ -190,9 +190,9 @@ int                     iPumpSpeed;             // Time frame to operate in
 LiquidCrystal_I2C       lcd(LCD_I2C_ADDR, LCD_EN_PIN, LCD_RW_PIN, LCD_RS_PIN, LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
 
 // +++++++++++++++++++++++ PT100 +++++++++++++++++++++++
-PT100                   basePT100("base", PT100_BASE_OUTPUT_PIN, PT100_BASE_INPUT_PIN, PT100_BASE_TIME_BETWEEN_READINGS, PT100_BASE_DEFAULT_ADC_VMAX, PT100_BASE_DEFAULT_VS, PT100_BASE_DEFAULT_R1_RESISTENCE, PT100_BASE_DEFAULT_LINE_RESISTENCE, PT100_BASE_DEFAULT_OPERATION_RESISTENCE);
-PT100                   upPT100("up", PT100_UP_OUTPUT_PIN, PT100_UP_INPUT_PIN, PT100_UP_TIME_BETWEEN_READINGS, PT100_UP_DEFAULT_ADC_VMAX, PT100_UP_DEFAULT_VS, PT100_UP_DEFAULT_R1_RESISTENCE, PT100_UP_DEFAULT_LINE_RESISTENCE, PT100_UP_DEFAULT_OPERATION_RESISTENCE);
-PT100                   downPT100("down", PT100_DOWN_OUTPUT_PIN, PT100_DOWN_INPUT_PIN, PT100_DOWN_TIME_BETWEEN_READINGS, PT100_DOWN_DEFAULT_ADC_VMAX, PT100_DOWN_DEFAULT_VS, PT100_DOWN_DEFAULT_R1_RESISTENCE, PT100_DOWN_DEFAULT_LINE_RESISTENCE, PT100_DOWN_DEFAULT_OPERATION_RESISTENCE);
+PT100                   basePT100("base", PT100_BASE_OUTPUT_PIN, PT100_BASE_INPUT_PIN, PT100_BASE_TIME_BETWEEN_READINGS, PT100_BASE_DEFAULT_ADC_VMAX, PT100_BASE_DEFAULT_VS, PT100_BASE_DEFAULT_R1_RESISTENCE, PT100_BASE_DEFAULT_LINE_RESISTENCE, PT100_BASE_DEFAULT_OPERATION_RESISTENCE, 0.0, 0.0);
+PT100                   upPT100("up", PT100_UP_OUTPUT_PIN, PT100_UP_INPUT_PIN, PT100_UP_TIME_BETWEEN_READINGS, PT100_UP_DEFAULT_ADC_VMAX, PT100_UP_DEFAULT_VS, PT100_UP_DEFAULT_R1_RESISTENCE, PT100_UP_DEFAULT_LINE_RESISTENCE, PT100_UP_DEFAULT_OPERATION_RESISTENCE, 0.112329092, -3.57);
+PT100                   downPT100("down", PT100_DOWN_OUTPUT_PIN, PT100_DOWN_INPUT_PIN, PT100_DOWN_TIME_BETWEEN_READINGS, PT100_DOWN_DEFAULT_ADC_VMAX, PT100_DOWN_DEFAULT_VS, PT100_DOWN_DEFAULT_R1_RESISTENCE, PT100_DOWN_DEFAULT_LINE_RESISTENCE, PT100_DOWN_DEFAULT_OPERATION_RESISTENCE, 0.22, -5.5);
 
 // ######################### INTERRUPTS #########################
 void isr ()  {    // Interrupt service routine is executed when a HIGH to LOW transition is detected on CLK
@@ -395,7 +395,7 @@ void setup() {
   boilTime                    =   5400;
   coolingTime                 =   120;
 
-  startpointTemperature       =   33; //30;
+  startpointTemperature       =   50; //30;
   betaGlucanaseTemperature    =   40;
   debranchingTemperature      =   40;
   proteolyticTemperature      =   50;
@@ -1017,7 +1017,7 @@ void xCountTheTime( int temperatureRange ) {
   // Calculate the remaining time on the clock
   clockCounter = cookTime * 1000 - (now - clockStartTime - clockIgnore);
 
-#ifdef DEBUG
+#ifdef DEBUG_OFF
   debugPrintFunction("xCountTheTime");
   debugPrintVar("millis()", now);
   debugPrintVar("cookTime", cookTime);
@@ -1056,21 +1056,21 @@ bool xRegulateTemperature() {
     // turn it off
     wattage = 0.0;
   } else {
-    if(difference <= 1) {
+    if(difference <= 0.1) {
       // turn it off
       wattage = 0.0;
     } else {
-      if(difference <= 3) {
+      if(difference <= 1) {
         // pulse lightly at 500 watt
         wattage = 500.0;
       } else {
-        if(difference <= 6) {
+        if(difference <= 3) {
           // pulse moderately at 1000 watt
           wattage = 1000.0;
         } else {
-          if(difference <= 9) {
+          if(difference <= 6) {
             // pulse hardly at 2000 watt
-          wattage = 2000.0;
+            wattage = 2000.0;
           } else {
             //pulse constantly at HEATING_ELEMENT_MAX_WATTAGE watt
             wattage = HEATING_ELEMENT_MAX_WATTAGE;
@@ -1087,20 +1087,20 @@ bool xRegulateTemperature() {
   
   // Apply wattage to the element at the right time
   if( ulWattToWindowTime( wattage ) > (millis() - windowStartTime) ) {
-    //digitalWrite(HEATING_ELEMENT_OUTPUT_PIN,HIGH);
+    digitalWrite(HEATING_ELEMENT_OUTPUT_PIN,HIGH);
   } else {
     digitalWrite(HEATING_ELEMENT_OUTPUT_PIN,LOW);
   }
 
 #ifdef DEBUG_OFF
-  debugPrintFunction("xRegulateTemperature");
+  //debugPrintFunction("xRegulateTemperature");
   debugPrintVar("difference", difference);
-  debugPrintVar("overTemperature", overTemperature);
+  //debugPrintVar("overTemperature", overTemperature);
   debugPrintVar("wattage", wattage);
-  debugPrintVar("ulWattToWindowTime( wattage )", ulWattToWindowTime( wattage ) );
-  debugPrintVar("millis()", millis());
-  debugPrintVar("windowStartTime", windowStartTime);
-  debugPrintVar("test", ulWattToWindowTime( wattage ) > (millis() - windowStartTime) ); 
+  //debugPrintVar("ulWattToWindowTime( wattage )", ulWattToWindowTime( wattage ) );
+  //debugPrintVar("millis()", millis());
+  //debugPrintVar("windowStartTime", windowStartTime);
+  //debugPrintVar("test", ulWattToWindowTime( wattage ) > (millis() - windowStartTime) ); 
 #endif
 }
 
@@ -1109,9 +1109,9 @@ bool xRegulatePumpSpeed() {
 
   if( iPumpSpeed ) {
     //basePT100.setPower( PT100_BASE_DARLINGTON_ADC_VMAX, PT100_BASE_DARLINGTON_VS );
-    basePT100.setMeasuredTemperatureDeviation( -1.00 );
+    basePT100.setMeasuredTemperatureDeviation( -0.90 );
     upPT100.setMeasuredTemperatureDeviation( -1.00 );
-    downPT100.setMeasuredTemperatureDeviation( -1.00 );
+    downPT100.setMeasuredTemperatureDeviation( -1.10 );
   }
   else {
     //basePT100.setPower( PT100_BASE_DEFAULT_ADC_VMAX, PT100_BASE_DEFAULT_VS );
@@ -1301,6 +1301,7 @@ void operateMachine() {
   basePT100.measure();
   upPT100.measure();
   downPT100.measure();
+  Serial.println(" ");
   //analogWrite(6, iPumpSpeed);
 
   // If cooking is done, return (this is a nice place to double check safety and ensure the cooking parts aren't on.
