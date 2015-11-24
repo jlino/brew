@@ -1,151 +1,83 @@
+/*
+  brew.ino - Main execution file.
+  Created by João Lino, August 28, 2014.
+  Released into the public domain.
+*/
+
 #define DEBUG
 
-// ######################### CONSTANTS #########################
-
-// ######################### SETTINGS #########################
-// ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
-#define HEATING_ELEMENT_DEFAULT_WINDOW_SIZE       1000
-#define HEATING_ELEMENT_OUTPUT_PIN                24
-#define HEATING_ELEMENT_MAX_HEAT_PWM_INTEGER      5
-#define HEATING_ELEMENT_MAX_HEAT_PWM_FLOAT        5.0
-#define HEATING_ELEMENT_MAX_WATTAGE               3000.0          // Minimum = 2000.0
-#define HEATING_ELEMENT_AC_FREQUENCY_HZ           50.0
-
-// ++++++++++++++++++++++++ Temperature ++++++++++++++++++++++++
-#define PT100_BASE_INPUT_PIN                      A4
-#define PT100_BASE_OUTPUT_PIN                     32
-#define PT100_BASE_TIME_BETWEEN_READINGS          100
-#define PT100_UP_INPUT_PIN                        A5
-#define PT100_UP_OUTPUT_PIN                       30
-#define PT100_UP_TIME_BETWEEN_READINGS            100
-#define PT100_DOWN_INPUT_PIN                      A6
-#define PT100_DOWN_OUTPUT_PIN                     31
-#define PT100_DOWN_TIME_BETWEEN_READINGS          100
-
-#define PT100_BASE_DEFAULT_ADC_VMAX               1.1
-#define PT100_BASE_DEFAULT_VS                     5.0
-#define PT100_BASE_DEFAULT_R1_RESISTENCE          605.2 //608.99
-#define PT100_BASE_DEFAULT_LINE_RESISTENCE        0.0
-#define PT100_BASE_DEFAULT_OPERATION_RESISTENCE   0.0
-#define PT100_UP_DEFAULT_ADC_VMAX                 1.1
-#define PT100_UP_DEFAULT_VS                       5.0
-#define PT100_UP_DEFAULT_R1_RESISTENCE            615.6 //621 //620 //618.1
-#define PT100_UP_DEFAULT_LINE_RESISTENCE          0.0
-#define PT100_UP_DEFAULT_OPERATION_RESISTENCE     0.0
-#define PT100_DOWN_DEFAULT_ADC_VMAX               1.1
-#define PT100_DOWN_DEFAULT_VS                     5.0
-#define PT100_DOWN_DEFAULT_R1_RESISTENCE          618.6 //619.3 //617.2
-#define PT100_DOWN_DEFAULT_LINE_RESISTENCE        0.0
-#define PT100_DOWN_DEFAULT_OPERATION_RESISTENCE   0.0
-
-// ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
-//#define MIXER_PIN     12
-//#define MIXER_MAX_POSITION   255
-
-// ++++++++++++++++++++++++ Pump ++++++++++++++++++++++++
-#include "Melody.h"
-#define PIEZO_PIN                                 25
-
-// ++++++++++++++++++++++++ Pump ++++++++++++++++++++++++
-#define PUMP_PIN                                  6
-#define PUMP_SPEED_STOP                           0
-#define PUMP_SPEED_SLOW                           64
-#define PUMP_SPEED_AVERAGE                        128
-#define PUMP_SPEED_FAST                           192
-#define PUMP_SPEED_MAX                            255
-
-// ++++++++++++++++++++++++ Rotary Encoder ++++++++++++++++++++++++
-#define ROTARY_ENCODER_INTERRUPT_NUMBER           1    // On Mega2560 boards, interrupt 1 is on pin 3
-#define ROTARY_ENCODER_CLK_PIN                    3    // Used for generating interrupts using CLK signal
-#define ROTARY_ENCODER_DT_PIN                     22    // Used for reading DT signal
-#define ROTARY_ENCODER_SW_PIN                     23    // Used for the push button switch
-#define ROTARY_ENCODER_DEBOUNCE_TIME              20    // Number of miliseconds to ignore new signals a signal is received
-
-// ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
-#define SETTING_WELCOME_TIMEOUT                   100
-#define SETTING_MAX_INACTIVITY_TIME               3000
-#define MENU_MAX_DEPTH                            10
-#define MENU_INIT_VALUES                          -1,-1,-1,-1,-1,-1,-1,-1,-1,-1
-#define MENU_SIZE_MAIN_MENU                       17
-#define SETTING_SERIAL_MONITOR_BAUD_RATE          9600
-#define SETTING_SERIAL_MONITOR_WELCOME_MESSAGE    "Let's start Brewing!"
-
 // ######################### LIBRARIES #########################
+
 // ++++++++++++++++++++++++ LiquidCrystal_I2C ++++++++++++++++++++++++
 #include <Wire.h>
 #include <LCD.h>
 #include <LiquidCrystal_I2C.h>
 
-#define LCD_I2C_ADDR                              0x27    // <<----- Add your address here.  Find it from I2C Scanner
-#define LCD_HORIZONTAL_RESOLUTION                 16
-#define LCD_VERTICAL_RESOLUTION                   2
-#define LCD_BACKLIGHT_PIN                         3
-#define LCD_EN_PIN                                2
-#define LCD_RW_PIN                                1
-#define LCD_RS_PIN                                0
-#define LCD_D4_PIN                                4
-#define LCD_D5_PIN                                5
-#define LCD_D6_PIN                                6
-#define LCD_D7_PIN                                7
-
 // ++++++++++++++++++++++++ PT100 +++++++++++++++++++++++++++++++++
 #include <PT100.h>
 
-// ++++++++++++++++++++++++ ENUM +++++++++++++++++++++++++++++++++
+// ++++++++++++++++++++++++ OTHER +++++++++++++++++++++++++++++++++
+#include "debug.h"
+
+#include "config.h"
+
 #include "CustomDataStructures.h"
 
-// ######################### TEMPLATES #########################
-// ++++++++++++++++++++++++ Debug ++++++++++++++++++++++++
-template <class T> void debugPrintVar( char *name, const T& value );
-template <class T> void debugPrintVar( char *name, const T& value ) {
-  Serial.print("[");
-  Serial.print(name);
-  Serial.print(":");
-  Serial.print(value);
-  Serial.println("]");
-}
-void debugPrintFunction( char *name ) {
-  Serial.print("++++++++++++++++++++++++ ");
-  Serial.print(name);
-  Serial.println("++++++++++++++++++++++++");
-}
+#include "Melody.h"
+#include "Display.h"
 
 // ######################### VARIABLES #########################
 // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
 eRotaryEncoderMode      rotaryEncoderMode;
-eMainMenuOptions        mainMenuOption;
-ePresetsMenuOptions     presetsMenuOption;
+
+eCookingStages          cookingStage;
+eBeerProfile            beerProfile;
+
+eMenuType               eMenuType;
+
+eMainMenuOptions        eMainMenuPosition;
+eMainMenuOptions        eMainMenuSelection;
+eBeerProfileMenuOptions eBeerProfileMenuPosition;
+eBeerProfileMenuOptions eBeerProfileMenuSelection;
+eStageMenuOptions       eStageMenuPosition;
+eStageMenuOptions       eStageMenuSelection;
+eMaltMenuOptions        eMaltMenuPosition;
+eMaltMenuOptions        eMaltMenuSelection; 
+eSettingsMenuOptions    eSettingsMenuPosition;
+eSettingsMenuOptions    eSettingsMenuSelection;
+
 eMaltMenuOptions        maltMenuOption;
 eSettingsMenuOptions    settingsMenuOption;
-eCookingStages          cookingStage;
 
 // ++++++++++++++++++++++++ Global Variables ++++++++++++++++++++++++
 boolean                 cooking;
 boolean                 bStageFirstRun;
 
-unsigned long                     clockStartTime;
-unsigned long                     clockCounter;
-unsigned long                     clockIgnore;
+unsigned long           clockStartTime;
+unsigned long           clockLastUpdate;
+long                    clockCounter;
+unsigned long           clockIgnore;
 boolean                 clockStart;
 boolean                 clockEnd;
 
-unsigned long                     cookTime;
+unsigned long           cookTime;
 int                     cookTemperature;
 //cook_mode_list        cookMode;
 //int                   cookMixerSpeed;
-int                     cookHeatPWM;
+int                     finalYield;
         
-unsigned long                     startpointTime;
-unsigned long                     betaGlucanaseTime;
-unsigned long                     debranchingTime;
-unsigned long                     proteolyticTime;
-unsigned long                     betaAmylaseTime;
-unsigned long                     alphaAmylaseTime;
-unsigned long                     mashoutTime;
-unsigned long                     recirculationTime;
-unsigned long                     spargeTime;
-unsigned long                     boilTime;
-unsigned long                     coolingTime;
+unsigned long           startpointTime;
+unsigned long           betaGlucanaseTime;
+unsigned long           debranchingTime;
+unsigned long           proteolyticTime;
+unsigned long           betaAmylaseTime;
+unsigned long           alphaAmylaseTime;
+unsigned long           mashoutTime;
+unsigned long           recirculationTime;
+unsigned long           spargeTime;
+unsigned long           boilTime;
+unsigned long           coolingTime;
+unsigned long           cleaningTime;
         
 int                     startpointTemperature;
 int                     betaGlucanaseTemperature;
@@ -158,12 +90,12 @@ int                     recirculationTemperature;
 int                     spargeTemperature;
 int                     boilTemperature;
 int                     coolingTemperature;
-
-//int                   menuSize;
-int                     menu_position[MENU_MAX_DEPTH] = {MENU_INIT_VALUES};
+int                     cleaningTemperature;
 
 boolean                 refresh;
 boolean                 repaint;
+
+boolean                 bStatusElement;
 
 // ++++++++++++++++++++++++ Interrupts ++++++++++++++++++++++++
 static unsigned long    lastInterruptTime;
@@ -190,9 +122,9 @@ int                     iPumpSpeed;             // Time frame to operate in
 LiquidCrystal_I2C       lcd(LCD_I2C_ADDR, LCD_EN_PIN, LCD_RW_PIN, LCD_RS_PIN, LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
 
 // +++++++++++++++++++++++ PT100 +++++++++++++++++++++++
-PT100                   basePT100("base", PT100_BASE_OUTPUT_PIN, PT100_BASE_INPUT_PIN, PT100_BASE_TIME_BETWEEN_READINGS, PT100_BASE_DEFAULT_ADC_VMAX, PT100_BASE_DEFAULT_VS, PT100_BASE_DEFAULT_R1_RESISTENCE, PT100_BASE_DEFAULT_LINE_RESISTENCE, PT100_BASE_DEFAULT_OPERATION_RESISTENCE, 0.0, 0.0);
-PT100                   upPT100("up", PT100_UP_OUTPUT_PIN, PT100_UP_INPUT_PIN, PT100_UP_TIME_BETWEEN_READINGS, PT100_UP_DEFAULT_ADC_VMAX, PT100_UP_DEFAULT_VS, PT100_UP_DEFAULT_R1_RESISTENCE, PT100_UP_DEFAULT_LINE_RESISTENCE, PT100_UP_DEFAULT_OPERATION_RESISTENCE, 0.112329092, -3.57);
-PT100                   downPT100("down", PT100_DOWN_OUTPUT_PIN, PT100_DOWN_INPUT_PIN, PT100_DOWN_TIME_BETWEEN_READINGS, PT100_DOWN_DEFAULT_ADC_VMAX, PT100_DOWN_DEFAULT_VS, PT100_DOWN_DEFAULT_R1_RESISTENCE, PT100_DOWN_DEFAULT_LINE_RESISTENCE, PT100_DOWN_DEFAULT_OPERATION_RESISTENCE, 0.22, -5.5);
+PT100                   basePT100("base", PT100_BASE_OUTPUT_PIN, PT100_BASE_OUTPUT_R_PIN, PT100_BASE_INPUT_PIN, PT100_BASE_INPUT_R_PIN, PT100_BASE_TIME_BETWEEN_READINGS, PT100_BASE_DEFAULT_ADC_VMAX, PT100_BASE_DEFAULT_VS, PT100_BASE_DEFAULT_R1_RESISTENCE, PT100_BASE_DEFAULT_R2_RESISTENCE, 0.0, 0.0);//0.0, 0.0);
+PT100                   upPT100("up", PT100_UP_OUTPUT_PIN, PT100_UP_OUTPUT_R_PIN, PT100_UP_INPUT_PIN, PT100_UP_INPUT_R_PIN, PT100_UP_TIME_BETWEEN_READINGS, PT100_UP_DEFAULT_ADC_VMAX, PT100_UP_DEFAULT_VS, PT100_UP_DEFAULT_R1_RESISTENCE, PT100_UP_DEFAULT_R2_RESISTENCE, -0.2, 8.0);//8.0);//0.17,  -7.2); //0.195, -7.6);//0.0, 0.0);//0.38, -3.0);  //0.112329092, -3.57); //0.0, 0.0);
+PT100                   downPT100("down", PT100_DOWN_OUTPUT_PIN, PT100_DOWN_OUTPUT_R_PIN, PT100_DOWN_INPUT_PIN, PT100_DOWN_INPUT_R_PIN, PT100_DOWN_TIME_BETWEEN_READINGS, PT100_DOWN_DEFAULT_ADC_VMAX, PT100_DOWN_DEFAULT_VS, PT100_DOWN_DEFAULT_R1_RESISTENCE, PT100_DOWN_DEFAULT_R2_RESISTENCE, 0.0, -2.2);//0.228, -9); //0.26,  -10);//0.0, 0.0);//0.53, -6.6);  //0.22, -5.5); //0.0, 0.0);
 
 // ######################### INTERRUPTS #########################
 void isr ()  {    // Interrupt service routine is executed when a HIGH to LOW transition is detected on CLK
@@ -300,20 +232,25 @@ void xSafeHardwarePowerOff() {
   // Force shutdown
   analogWrite(PUMP_PIN, PUMP_SPEED_STOP);  // analogWrite values from 0 to 255
   digitalWrite(HEATING_ELEMENT_OUTPUT_PIN, LOW);  // Turn heading element OFF for safety
+  bStatusElement = false;
 
-//analogWrite(MIXER_PIN, 0);        // Turn mixer OFF for safety
+  basePT100.setSampleDeviation( 0.0 );
+  upPT100.setSampleDeviation( 0.0 );
+  downPT100.setSampleDeviation( 0.0 );
+
+  //analogWrite(MIXER_PIN, 0);        // Turn mixer OFF for safety
 }
 
-void displayWelcome() {
-#ifndef DEBUG
-  lcdPrint("  Let's start", "    Brewing!");    // Write welcome
+void xWelcomeUser() {
+  //#ifndef DEBUG
+  lcdPrint(&lcd, "  Let's start", "    Brewing!");    // Write welcome
 
   // Play Melody;
   sing(MELODY_SUPER_MARIO_START, PIEZO_PIN);
 
   //termometerCalibration();
   delay(SETTING_WELCOME_TIMEOUT);      // pause for effect
-#endif
+  //#endif
 }
 
 void setup() {
@@ -326,6 +263,7 @@ void setup() {
   // ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
   pinMode                         (HEATING_ELEMENT_OUTPUT_PIN, OUTPUT);
   digitalWrite                    (HEATING_ELEMENT_OUTPUT_PIN, LOW);
+  bStatusElement              =   false;
   windowStartTime             =   millis();
   dWattPerPulse               =   HEATING_ELEMENT_MAX_WATTAGE / HEATING_ELEMENT_AC_FREQUENCY_HZ;
 
@@ -343,11 +281,11 @@ void setup() {
 
   // ++++++++++++++++++++++++ Temperature Sensor PT100 ++++++++++++++++++++++++
   //basePT100.setup();
-/*
+  /*
   analogReference  (INTERNAL1V1);          // EXTERNAL && INTERNAL2V56 && INTERNAL1V1
   pinMode    (PT100_OUTPUT_PIN, OUTPUT);  // setup temperature sensor input pin
   digitalWrite    (PT100_OUTPUT_PIN, LOW);    // initialize sensor off
-*/
+  */
   // ++++++++++++++++++++++++ Serial Monitor ++++++++++++++++++++++++
   Serial.begin                    (SETTING_SERIAL_MONITOR_BAUD_RATE);    // setup terminal baud rate
   Serial.println                  (SETTING_SERIAL_MONITOR_WELCOME_MESSAGE);  // print a start message to the terminal
@@ -363,15 +301,28 @@ void setup() {
   xSetupRotaryEncoder             ( eRotaryEncoderMode_Disabled, 0, 0, 0, 0, 0 );
 
   // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
-  presetsMenuOption           =   ePresetsMenu_Trigo;
-  maltMenuOption              =   eMaltMenu_CastleMalting_Chteau_Pilsen_2RS;
-  settingsMenuOption          =   eSettingsMenu_PT100_Element;
+  eMenuType                   =   eMenuType_Main;
+  
+  eMainMenuPosition           =   eMainMenu_GO;
+  eMainMenuSelection          =   eMainMenu_NULL;
+  eBeerProfileMenuPosition    =   eBeerProfileMenu_Basic;
+  eBeerProfileMenuSelection   =   eBeerProfileMenu_NULL;
+  eStageMenuPosition          =   eStageMenu_Startpoint;
+  eStageMenuSelection         =   eStageMenu_NULL;
+  eMaltMenuPosition           =   eMaltMenu_CastleMalting_Chteau_Pilsen_2RS;
+  eMaltMenuSelection          =   eMaltMenu_NULL;
+  eSettingsMenuPosition       =   eSettingsMenu_PT100_Element;
+  eSettingsMenuSelection      =   eSettingsMenu_NULL;
+
   cookingStage                =   eCookingStage_Startpoint;
+  beerProfile                 =   eBeerProfile_Basic;
   // ++++++++++++++++++++++++ Global Variables ++++++++++++++++++++++++
+
   cooking                     =   false;
   bStageFirstRun              =   true;
 
   clockStartTime              =   0;
+  clockLastUpdate             =   0;
   clockCounter                =   0;
   clockIgnore                 =   0;
   clockStart                  =   false;
@@ -381,9 +332,9 @@ void setup() {
   cookTemperature             =   25;
   //cookMode                  =   quick_start;
   //cookMixerSpeed            =   120;
-  cookHeatPWM                 =   5;
+  finalYield                  =   25;
 
-  startpointTime              =   3600; //120;
+  startpointTime              =   120;
   betaGlucanaseTime           =   0;
   debranchingTime             =   0;
   proteolyticTime             =   0;
@@ -394,8 +345,9 @@ void setup() {
   spargeTime                  =   1200;
   boilTime                    =   5400;
   coolingTime                 =   120;
+  cleaningTime                =   SETTING_CLEANING_TIME;
 
-  startpointTemperature       =   50; //30;
+  startpointTemperature       =   30;
   betaGlucanaseTemperature    =   40;
   debranchingTemperature      =   40;
   proteolyticTemperature      =   50;
@@ -406,6 +358,7 @@ void setup() {
   spargeTemperature           =   80;
   boilTemperature             =   100;
   coolingTemperature          =   25;
+  cleaningTemperature         =   SETTING_CLEANING_TEMPERATURE;
 
   refresh                     =   true;
   repaint                     =   true;
@@ -416,16 +369,18 @@ void setup() {
   // ++++++++++++++++++++++++ PID  ++++++++++++++++++++++++
   iWindowSize                 =   HEATING_ELEMENT_DEFAULT_WINDOW_SIZE;    // Time frame to operate in
 
-// ######################### Code - Run Once #########################
+  // ######################### Code - Run Once #########################
   xSafeHardwarePowerOff           ();
-  displayWelcome                  ();
+  xWelcomeUser                    ();
   
-  xSetupRotaryEncoder             ( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
+  xSetupRotaryEncoder             ( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
 }
 
 // ######################### MAIN LOOP #########################
 
 void loop() {
+  //cleanSerialMonitor();
+
   unsigned long inactivityTime = millis() - lastInterruptTime;
 
   if(inactivityTime > SETTING_MAX_INACTIVITY_TIME) {    // Inactivity check
@@ -433,598 +388,747 @@ void loop() {
       repaint = true;
       refresh = false;
     }
-    displayStatus();
+    repaint = displayStatus( &lcd, cooking, cookTemperature, basePT100.getCurrentTemperature(), upPT100.getCurrentTemperature(), downPT100.getCurrentTemperature(), clockCounter, repaint );
   }
   else {
-    displayMainMenu();
+    runMenu();
   }
   
-  operateMachine();
+  xManageMachineSystems();
 }
 
 // ######################### FUNCTIONS ########################
 
-void xPaintStatusTemplate() {
-  // Clear LCD
-  lcd.clear();        
-
-  // Position the cursor at the begining of where the temperature template goes onto the screen
-  lcd.home();    
-
-  // Print the target and measured temperature template
-  if(cooking) {
-    lcd.print("ON  XX 000.0/000C");
+void runMenu() {
+  #ifdef DEBUG_OFF
+  boolean debug_go = repaint;
+  if(debug_go) {
+    debugPrintFunction("runMenu");
+    debugPrintVar("repaint", repaint);
+    debugPrintVar("eMenuType", eMenuType);
+    debugPrintVar("rotaryEncoderVirtualPosition", rotaryEncoderVirtualPosition);
   }
-  else {
-    lcd.print("OFF XX 000.0/000C");
+  #endif
+
+  switch(eMenuType) {
+    case eMenuType_Main: {
+      eMainMenuPosition = static_cast<eMainMenuOptions>(rotaryEncoderVirtualPosition);
+
+      repaint = displayMainMenu( &lcd, eMainMenuPosition, repaint );
+
+      if ( gotButtonPress( ROTARY_ENCODER_SW_PIN ) ) {
+        eMainMenuSelection = eMainMenuPosition;
+      }
+
+      runMainMenuSelection();
+
+      break;
+    }
+    case eMenuType_BeerProfile: {
+      eBeerProfileMenuPosition = static_cast<eBeerProfileMenuOptions>(rotaryEncoderVirtualPosition);
+      
+      repaint = displayBeerProfileMenu( &lcd, eBeerProfileMenuPosition, repaint );
+
+      if ( gotButtonPress( ROTARY_ENCODER_SW_PIN ) ) {
+        eBeerProfileMenuSelection = eBeerProfileMenuPosition;
+      }
+
+      runBeerProfileSelection();
+      
+      break;
+    }
+    case eMenuType_Stage: {
+      eStageMenuPosition = static_cast<eStageMenuOptions>(rotaryEncoderVirtualPosition);
+      
+      repaint = displayStageMenu( &lcd, eStageMenuPosition, repaint );
+
+      if ( gotButtonPress( ROTARY_ENCODER_SW_PIN ) ) {
+        eStageMenuSelection = eStageMenuPosition;
+      }
+
+      runStageSelection();
+      
+      break;
+    }
+    case eMenuType_Malt: {
+      eMaltMenuPosition = static_cast<eMaltMenuOptions>(rotaryEncoderVirtualPosition);
+      
+      repaint = displayMaltMenu( &lcd, eMaltMenuPosition, repaint );
+
+      if ( gotButtonPress( ROTARY_ENCODER_SW_PIN ) ) {
+        eMaltMenuSelection = eMaltMenuPosition;
+      }
+
+      runMaltSelection();
+      
+      break;
+    }
+    case eMenuType_Settings: {
+      eSettingsMenuPosition = static_cast<eSettingsMenuOptions>(rotaryEncoderVirtualPosition);
+      
+      repaint = displaySettingsMenu( &lcd, eSettingsMenuPosition, repaint );
+
+      if ( gotButtonPress( ROTARY_ENCODER_SW_PIN ) ) {
+        eSettingsMenuSelection = eSettingsMenuPosition;
+      }
+
+      runSettingsSelection();
+      
+      break;
+    }
   }
 
-  // Position the cursor at the begining of where the mode and time template goes onto the screen
-  lcd.setCursor (0,LCD_VERTICAL_RESOLUTION-1);
-
-  lcd.print("****       00:00");
+  #ifdef DEBUG_OFF
+  if(debug_go) {
+    debugPrintVar("repaint", repaint);
+  }
+  #endif
 }
 
-void displayStatus() {
+void runSettingsSelection() {
+  switch(eSettingsMenuSelection) {
+    case eSettingsMenu_PT100_Element: {
+      // Stuff
 
-  // Check whether a template repaint is required
-  if(repaint) {
-    // Repaint the LCD template
-    xPaintStatusTemplate();
-    
-    // Reset the repaint flag after the repaint has been done
-    repaint = false;
-  }
-  
-  double displayTemperature = 0.0;
-  unsigned long ulTimeToShow = millis() % 6000;
+      backToStatus();
+      
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eSettingsMenu_PT100_Up: {
+      // Stuff
 
-  lcd.setCursor (4,0);
-  if(ulTimeToShow < 2000) {
-    displayTemperature = basePT100.getCurrentTemperature();
+      backToStatus();
+      
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eSettingsMenu_PT100_Down: {
+      // Stuff
 
-    lcd.print("TS");
-  }
-  else {
-    if(ulTimeToShow < 4000) {
-      displayTemperature = upPT100.getCurrentTemperature();
-
-      lcd.print("UP");
-    }
-    else {
-      displayTemperature = downPT100.getCurrentTemperature();
-
-      lcd.print("DW");
-    }
-  }
-
-  // Print positions with no numbers, before the measured temperature value
-  lcd.setCursor (7,0);
-  if (displayTemperature < 10) {
-    lcd.print("  ");
-  }
-  else {
-    if (displayTemperature < 100) {
-      lcd.print(" ");
-    }
-  }
-
-  // Print measured temperature value onto the LCD
-  lcd.print(displayTemperature, 1);
-
-  // Print positions with no numbers, before the target temperature value
-  lcd.setCursor (13,0);
-  if (cookTemperature < 10) {
-    lcd.print("  ");
-  }
-  else {
-    if (cookTemperature < 100) {
-      lcd.print(" ");
-    }
-  }
-
-  // Print target temperature value onto the LCD
-  lcd.print(cookTemperature);
-  
-  // Calculate the numbers on the timer clock
-  unsigned long minutes = clockCounter / 1000 / 60;
-  unsigned long seconds = (clockCounter / 1000) % 60;
-
-  // Position the cursor at the begining of where the timer goes onto the screen
-  lcd.setCursor (10, 1);
-  
-  // Print the timer values onto the LCD
-  if (minutes < 10) {
-    lcd.print(" 0");
-  }
-  else {
-    if (minutes < 100) {
-      lcd.print(" ");
-    }
-  }
-  lcd.print(minutes);
-  lcd.print(":");
-  if(seconds<10) {
-    lcd.print("0");
-  }
-  lcd.print(seconds);
-}
-
-void displayMainMenu() {
-  switch(menu_position[0]) {
-    case eMainMenu_GO: {
-      MainMenu_GO();
+      backToStatus();
       
-      menu_position[0] = -1;
+      eMenuType = eMenuType_Main;
+      repaint = true;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
       
       break;
     }
-    case eMainMenu_STOP: {
-      MainMenu_STOP();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Presets: {
-      MainMenu_Presets();
-      
-      menu_position[0] = -1;
+    case eSettingsMenu_Back: {
+      eMenuType = eMenuType_Main;
+      repaint = true;
       
       // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Presets, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Malt: {
-      MainMenu_Malt();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Malt, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Startpoint: {
-      MainMenu_Startpoint();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Startpoint, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_BetaGlucanase: {
-      MainMenu_BetaGlucanase();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_BetaGlucanase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Debranching: {
-      MainMenu_Debranching();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Proteolytic: {
-      MainMenu_Proteolytic();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Proteolytic, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_BetaAmylase: {
-      MainMenu_BetaAmylase();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_BetaAmylase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_AlphaAmylase: {
-      MainMenu_AlphaAmylase();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_AlphaAmylase, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Mashout: {
-      MainMenu_Mashout();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Mashout, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Recirculation: {
-      MainMenu_Recirculation();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Recirculation, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Sparge: {
-      MainMenu_Sparge();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Sparge, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Boil: {
-      MainMenu_Boil();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Boil, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Hops: {
-      MainMenu_Hops();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Hops, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Cooling: {
-      MainMenu_Cooling();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Cooling, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Purge: {
-      MainMenu_Purge();
-
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Purge, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Settings: {
-      MainMenu_Settings();
-      
-      menu_position[0] = -1;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Settings, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_Back: {
-      MainMenu_Back();
-        
-      menu_position[0] = -1;
-        
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_Back, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
 
       break;
     }
     default: {
-      if(repaint) {
-
-        // display menu
-        lcd.clear();
-        lcd.home (); // go home
-        lcd.print("Brewery Menu");
-        
-        switch(rotaryEncoderVirtualPosition) {
-          case eMainMenu_GO: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> GO           ");
-            break;
-          }
-          case eMainMenu_STOP: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> STOP         ");
-            break;
-          }
-          case eMainMenu_Presets: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Presets      ");
-            break;
-          }
-          case eMainMenu_Malt: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Malt         ");
-            break;
-          }
-          case eMainMenu_Startpoint: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Startpoint   ");
-            break;
-          }
-          case eMainMenu_BetaGlucanase: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> BetaGlucanase");
-            break;
-          }
-          case eMainMenu_Debranching: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Debranching  ");
-            break;
-          }
-          case eMainMenu_Proteolytic: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Proteolytic  ");
-            break;
-          }
-          case eMainMenu_BetaAmylase: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Beta Amylase ");
-            break;
-          }
-          case eMainMenu_AlphaAmylase: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Alpha Amylase");
-            break;
-          }
-          case eMainMenu_Mashout: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Mashout      ");
-            break;
-          }
-          case eMainMenu_Recirculation: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Recirculation");
-            break;
-          }
-          case eMainMenu_Sparge: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Sparge       ");
-            break;
-          }
-          case eMainMenu_Boil: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Boil         ");
-            break;
-          }
-          case eMainMenu_Hops: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Hops         ");
-            break;
-          }
-          case eMainMenu_Cooling: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Cooling      ");
-            break;
-          }
-          case eMainMenu_Purge: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Purge        ");
-            break;
-          }
-          case eMainMenu_Settings: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Settings     ");
-            break;
-          }
-          case eMainMenu_Back: {
-            lcd.setCursor (0,1);        // go to start of 2nd line
-            lcd.print("-> Back         ");
-            break;
-          }
-          default: {
-            // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-            xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 0, 1, 0 );
-          } 
-        }
-        
-        repaint = false;
-      }
-      
-      if ((digitalRead(ROTARY_ENCODER_SW_PIN))) {    // check if pushbutton is pressed
-        menu_position[0] = rotaryEncoderVirtualPosition;
-        while (digitalRead(ROTARY_ENCODER_SW_PIN)) {}    // wait til switch is released
-        delay(10);                            // debounce
-        break;
-      }
-    } 
+    }
   }
+
+  eSettingsMenuSelection = eSettingsMenu_NULL;
 }
 
-void MainMenu_GO() {
-  startBrewing();
+void runMaltSelection() {
+  switch(eMaltMenuSelection) {
+    case eMaltMenu_CastleMalting_Chteau_Pilsen_2RS: {
+      // Stuff
 
-  xTransitionIntoStage_GlobalVariables( eCookingStage_Startpoint );
+      backToStatus();
+      
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eMaltMenu_CastleMalting_Wheat_Blanc: {
+      // Stuff
 
-  backToStatus();
+      backToStatus();
+      
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eMaltMenu_Back: {
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+
+      break;
+    }
+    default: {
+    }
+  }
+
+  eMaltMenuSelection = eMaltMenu_NULL;
 }
 
-void MainMenu_STOP() {
-  stopBrewing();
-
-  backToStatus();
-}
-
-void MainMenu_Presets() {
-
-  backToStatus();
+void runStageSelection() {
+  switch(eStageMenuSelection) {
+    case eStageMenu_Startpoint: {
+      startpointTime = getTimer( startpointTime );
   
-}
+      startpointTemperature = xSetGenericValue( startpointTemperature, 0, 120, "temperature", "*C" );
 
-void MainMenu_Malt() {
+      backToStatus();
 
-  backToStatus();
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_BetaGlucanase: {
+      betaGlucanaseTime = getTimer( betaGlucanaseTime );
   
-}
+      betaGlucanaseTemperature = xSetGenericValue( betaGlucanaseTemperature, 0, 120, "temperature", "*C" );
 
-void MainMenu_Startpoint() {
-  startpointTime = getTimer( startpointTime );
+      backToStatus();
+
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_Debranching: {
+      debranchingTime = getTimer( debranchingTime );
   
-  startpointTemperature = xSetGenericValue( startpointTemperature, 0, 120, "temperature", "*C" );
+      debranchingTemperature = xSetGenericValue( debranchingTemperature, 0, 120, "temperature", "*C" );
 
-  backToStatus();
-}
+      backToStatus();
 
-void MainMenu_BetaGlucanase() {
-  betaGlucanaseTime = getTimer( betaGlucanaseTime );
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_Proteolytic: {
+      proteolyticTime = getTimer( proteolyticTime );
+      
+      proteolyticTemperature = xSetGenericValue( proteolyticTemperature, 0, 120, "temperature", "*C" );
+
+      backToStatus();
+
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_BetaAmylase: {
+      betaAmylaseTime = getTimer( betaAmylaseTime );
   
-  betaGlucanaseTemperature = xSetGenericValue( betaGlucanaseTemperature, 0, 120, "temperature", "*C" );
+      betaAmylaseTemperature = xSetGenericValue( betaAmylaseTemperature, 0, 120, "temperature", "*C" );
 
-  backToStatus();
-}
+      backToStatus();
 
-void MainMenu_Debranching() {
-  debranchingTime = getTimer( debranchingTime );
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_AlphaAmylase: {
+      alphaAmylaseTime = getTimer( alphaAmylaseTime );
   
-  debranchingTemperature = xSetGenericValue( debranchingTemperature, 0, 120, "temperature", "*C" );
+      alphaAmylaseTemperature = xSetGenericValue( alphaAmylaseTemperature, 0, 120, "temperature", "*C" );
 
-  backToStatus();
-}
+      backToStatus();
 
-void MainMenu_Proteolytic() {
-  proteolyticTime = getTimer( proteolyticTime );
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_Mashout: {
+      mashoutTime = getTimer( mashoutTime );
   
-  proteolyticTemperature = xSetGenericValue( proteolyticTemperature, 0, 120, "temperature", "*C" );
+      mashoutTemperature = xSetGenericValue( mashoutTemperature, 0, 120, "temperature", "*C" );
 
-  backToStatus();
-}
+      backToStatus();
 
-void MainMenu_BetaAmylase() {
-  betaAmylaseTime = getTimer( betaAmylaseTime );
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_Recirculation: {
+      recirculationTime = getTimer( recirculationTime );
   
-  betaAmylaseTemperature = xSetGenericValue( betaAmylaseTemperature, 0, 120, "temperature", "*C" );
+      recirculationTemperature = xSetGenericValue( recirculationTemperature, 0, 120, "temperature", "*C" );
 
-  backToStatus();
-}
+      backToStatus();
 
-void MainMenu_AlphaAmylase() {
-  alphaAmylaseTime = getTimer( alphaAmylaseTime );
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_Sparge: {
+      spargeTime = getTimer( spargeTime );
   
-  alphaAmylaseTemperature = xSetGenericValue( alphaAmylaseTemperature, 0, 120, "temperature", "*C" );
+      spargeTemperature = xSetGenericValue( spargeTemperature, 0, 120, "temperature", "*C" );
 
-  backToStatus();
+      backToStatus();
+
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_Boil: {
+      boilTime = getTimer( boilTime );
+      
+      boilTemperature = xSetGenericValue( boilTemperature, 0, 120, "temperature", "*C" );
+
+      backToStatus();
+
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_Cooling: {
+      coolingTime = getTimer( coolingTime );
+      
+      coolingTemperature = xSetGenericValue( coolingTemperature, 0, 120, "temperature", "*C" );
+
+      backToStatus();
+
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eStageMenu_Back: {
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+
+      break;
+    }
+    default: {
+    }
+  }
+
+  eStageMenuSelection = eStageMenu_NULL;
 }
 
-void MainMenu_Mashout() {
-  mashoutTime = getTimer( mashoutTime );
-  
-  mashoutTemperature = xSetGenericValue( mashoutTemperature, 0, 120, "temperature", "*C" );
+void runBeerProfileSelection() {
+  switch(eBeerProfileMenuSelection) {
+    case eBeerProfileMenu_Basic: {
+      beerProfile                 =   eBeerProfile_Basic;
 
-  backToStatus();
+      startpointTime              =   120;
+      betaGlucanaseTime           =   0;
+      debranchingTime             =   0;
+      proteolyticTime             =   0;
+      betaAmylaseTime             =   3600;
+      alphaAmylaseTime            =   1800;
+      mashoutTime                 =   300;
+      recirculationTime           =   1200;
+      spargeTime                  =   1200;
+      boilTime                    =   5400;
+      coolingTime                 =   120;
+
+      startpointTemperature       =   30;
+      betaGlucanaseTemperature    =   40;
+      debranchingTemperature      =   40;
+      proteolyticTemperature      =   50;
+      betaAmylaseTemperature      =   60;
+      alphaAmylaseTemperature     =   70;
+      mashoutTemperature          =   80;
+      recirculationTemperature    =   80;
+      spargeTemperature           =   80;
+      boilTemperature             =   100;
+      coolingTemperature          =   25;
+
+      backToStatus();
+
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+          
+      break;
+    }
+    case eBeerProfileMenu_Trigo: {
+      beerProfile                 =   eBeerProfile_Trigo;
+
+      startpointTime              =   120;
+      betaGlucanaseTime           =   0;
+      debranchingTime             =   0;
+      proteolyticTime             =   0;
+      betaAmylaseTime             =   3600;
+      alphaAmylaseTime            =   1800;
+      mashoutTime                 =   300
+      recirculationTime           =   1200
+      spargeTime                  =   1200;
+      boilTime                    =   5400;
+      coolingTime                 =   120;
+
+      startpointTemperature       =   45;
+      betaGlucanaseTemperature    =   40;
+      debranchingTemperature      =   40;
+      proteolyticTemperature      =   50;
+      betaAmylaseTemperature      =   62;
+      alphaAmylaseTemperature     =   70;
+      mashoutTemperature          =   78;
+      recirculationTemperature    =   80;
+      spargeTemperature           =   80;
+      boilTemperature             =   100;
+      coolingTemperature          =   25;
+
+      backToStatus();
+
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eBeerProfileMenu_IPA: {
+      beerProfile                 =   eBeerProfile_IPA;
+
+      backToStatus();
+      
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+
+      break;
+    }
+    case eBeerProfileMenu_Belga: {
+      beerProfile                 =   eBeerProfile_Belga;
+
+      backToStatus();
+      
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eBeerProfileMenu_Red: {
+      beerProfile                 =   eBeerProfile_Red;
+
+      backToStatus();
+      
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eBeerProfileMenu_APA: {
+      beerProfile                 =   eBeerProfile_APA;
+
+      backToStatus();
+      
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eBeerProfileMenu_Custom: {
+      beerProfile                 =   eBeerProfile_Custom;
+
+      startpointTime              =   120;
+      betaGlucanaseTime           =   120;
+      debranchingTime             =   120;
+      proteolyticTime             =   120;
+      betaAmylaseTime             =   120;
+      alphaAmylaseTime            =   120;
+      mashoutTime                 =   120;
+      recirculationTime           =   120;
+      spargeTime                  =   120;
+      boilTime                    =   120;
+      coolingTime                 =   120;
+
+      startpointTemperature       =   50;
+      betaGlucanaseTemperature    =   55;
+      debranchingTemperature      =   60;
+      proteolyticTemperature      =   65;
+      betaAmylaseTemperature      =   70;
+      alphaAmylaseTemperature     =   75;
+      mashoutTemperature          =   80;
+      recirculationTemperature    =   85;
+      spargeTemperature           =   90;
+      boilTemperature             =   95;
+      coolingTemperature          =   100;
+
+      backToStatus();
+      
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eBeerProfileMenu_Back: {
+      eMenuType = eMenuType_Main;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+
+      break;
+    }
+    default: {
+    }
+  }
+
+  eBeerProfileMenuSelection = eBeerProfileMenu_NULL;
 }
 
-void MainMenu_Recirculation() {
-  recirculationTime = getTimer( recirculationTime );
-  
-  recirculationTemperature = xSetGenericValue( recirculationTemperature, 0, 120, "temperature", "*C" );
+void runMainMenuSelection() {
+  switch(eMainMenuSelection) {
+    case eMainMenu_GO: {
+      finalYield = xSetGenericValue( finalYield, 0, 50, "Final Yield", "l" );
 
-  backToStatus();
+      startBrewing();
+
+      xSetupGlobalVariablesForStage( eCookingStage_Startpoint );
+
+      backToStatus();
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      xPurgePump();
+
+      break;
+    }
+    case eMainMenu_STOP: {
+      stopBrewing();
+
+      backToStatus();
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eMainMenu_SKIP: {
+      cookTime = 0;
+
+      backToStatus();
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eMainMenu_BeerProfile: {
+      eMenuType = eMenuType_BeerProfile;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eBeerProfileMenuPosition, MENU_SIZE_PROFILES_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eMainMenu_Stage: {
+      eMenuType = eMenuType_Stage;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eStageMenuPosition, MENU_SIZE_STAGE_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eMainMenu_Malt: {
+      eMenuType = eMenuType_Malt;
+      repaint = true;
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMaltMenuPosition, MENU_SIZE_MALT_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eMainMenu_Hops: {
+      backToStatus();
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eMainMenu_Clean: {
+      // Stop anything that might be still going on
+      xSafeHardwarePowerOff();
+
+      // Start at the Clean stage
+      startBrewing();
+
+      xSetupGlobalVariablesForStage( eCookingStage_Clean );
+
+      backToStatus();
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      xPurgePump();
+
+      break;
+    }
+    case eMainMenu_Purge: {
+      // Stop anything that might be still going on
+      xSafeHardwarePowerOff();
+
+      // Start at the Purge stage
+      startBrewing();
+
+      xSetupGlobalVariablesForStage( eCookingStage_Purge );
+
+      backToStatus();
+      
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+      
+      xPurgePump();
+
+      break;
+    }
+    case eMainMenu_Settings: {
+      eMenuType = eMenuType_Settings;
+      repaint = true;
+
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eSettingsMenuPosition, MENU_SIZE_SETTINGS_MENU - 1, 1, 1, 0 );
+      
+      break;
+    }
+    case eMainMenu_Back: {
+      backToStatus();
+        
+      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
+      xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMainMenuPosition, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+
+      break;
+    }
+    default: {
+    }
+  }
+
+  eMainMenuSelection = eMainMenu_NULL;
 }
 
-void MainMenu_Sparge() {
-  spargeTime = getTimer( spargeTime );
-  
-  spargeTemperature = xSetGenericValue( spargeTemperature, 0, 120, "temperature", "*C" );
 
-  backToStatus();
-}
-
-void MainMenu_Boil() {
-  boilTime = getTimer( boilTime );
-  
-  boilTemperature = xSetGenericValue( boilTemperature, 0, 120, "temperature", "*C" );
-
-  backToStatus();
-}
-
-void MainMenu_Hops() {
-
-  backToStatus();
-  
-}
-
-void MainMenu_Cooling() {
-  coolingTime = getTimer( coolingTime );
-  
-  coolingTemperature = xSetGenericValue( coolingTemperature, 0, 120, "temperature", "*C" );
-
-  backToStatus();
-}
-
-void MainMenu_Purge() {
-  // Stop anything that might be still going on
-  xSafeHardwarePowerOff();
-
-  // Start at the Purge stage
-  startBrewing();
-  xTransitionIntoStage_GlobalVariables( eCookingStage_Purge );
-
-  backToStatus();
-}
-
-void MainMenu_Settings() {
-  iPumpSpeed = xSetGenericValue( iPumpSpeed, 0, 255, "Pump Speed", "PWM" );
-
-  backToStatus();
-}
-
-void MainMenu_Back() {
-  backToStatus();
-}
-
-void xCountTheTime( int temperatureRange ) {
+void xCountTheTime( int temperatureRange, boolean bAverageUpDown ) {
   unsigned long now = millis();
+  unsigned long elapsedTime = now - clockLastUpdate;
+  double temperatureCount = 0;
+  
+  if( bAverageUpDown ) {
+    float tup = upPT100.getCurrentTemperature();
+    float tdown = downPT100.getCurrentTemperature();
+    if(tup > tdown) {
+      temperatureCount = tup;
+    }
+    else {
+      temperatureCount = tdown;
+    }
+  } else {
+    temperatureCount = basePT100.getCurrentTemperature();
+  }
 
   // Check if the machine is in the right temperature range, for the current mode,
-  if(!(basePT100.getCurrentTemperature() > (cookTemperature - temperatureRange) && basePT100.getCurrentTemperature() < (cookTemperature + temperatureRange))) {
-    clockIgnore += now - clockStartTime - clockIgnore;
+  //if(!( temperatureCount > (cookTemperature - temperatureRange) && temperatureCount < (cookTemperature + temperatureRange))) {
+  float margin = temperatureRange;
+  if( cookTemperature >= 100.0 ) {
+    margin = 2.0;
+  }
+  if( temperatureCount < (cookTemperature - margin) ) {
+    clockIgnore += elapsedTime;
   }
   
   // Calculate the remaining time on the clock
   clockCounter = cookTime * 1000 - (now - clockStartTime - clockIgnore);
 
-#ifdef DEBUG_OFF
+  if ( clockCounter < 0 ) {
+    clockCounter = 0;
+  }
+
+  clockLastUpdate = now;
+
+  #ifdef DEBUG_OFF
   debugPrintFunction("xCountTheTime");
   debugPrintVar("millis()", now);
   debugPrintVar("cookTime", cookTime);
   debugPrintVar("clockStartTime", clockStartTime);
   debugPrintVar("clockIgnore", clockIgnore);
   debugPrintVar("clockCounter", clockCounter); 
-#endif
+  #endif
 }
 
 bool isTimeLeft() {
@@ -1040,11 +1144,35 @@ double ulWattToWindowTime( double ulAppliedWatts ) {
   return (double)iWindowSize / 1000.0 * ulPulsesRequired * 1000.0 / HEATING_ELEMENT_AC_FREQUENCY_HZ;
 }
 
-bool xRegulateTemperature() {
-  double difference = cookTemperature - basePT100.getCurrentTemperature();
+bool xRegulateTemperature( boolean bAverageUpDown ) {
+  double difference = 0;
   bool overTemperature = false;
   double wattage = 0.0;
   
+  if( bAverageUpDown ) {
+    float tbase = basePT100.getCurrentTemperature();
+    float tup = upPT100.getCurrentTemperature();
+    float tdown = downPT100.getCurrentTemperature();
+
+    if(tup > tdown) {
+      difference = cookTemperature - tup;
+    }
+    else {
+      difference = cookTemperature - tdown;
+    }
+
+    if (tbase > (cookTemperature + 2.0)) {
+      difference = 0.0;
+    }
+
+    if (tbase < (cookTemperature)) {
+      difference = cookTemperature - tbase;
+    }
+
+  } else {
+    difference = cookTemperature - basePT100.getCurrentTemperature();
+  }
+
   // Deviation between the cook temperature set and the cook temperature measured
   if( difference < 0.0 ) {
     difference = difference * (-1.0);
@@ -1060,15 +1188,20 @@ bool xRegulateTemperature() {
       // turn it off
       wattage = 0.0;
     } else {
-      if(difference <= 1) {
+      if(difference <= 0.5) {
         // pulse lightly at 500 watt
-        wattage = 500.0;
+        if(cookTemperature > 99.0) {
+          wattage = 1500.0;
+        }
+        else {
+          wattage = 500.0;
+        }
       } else {
-        if(difference <= 3) {
+        if(difference <= 1.0) {
           // pulse moderately at 1000 watt
           wattage = 1000.0;
         } else {
-          if(difference <= 6) {
+          if(difference <= 3.0) {
             // pulse hardly at 2000 watt
             wattage = 2000.0;
           } else {
@@ -1088,11 +1221,13 @@ bool xRegulateTemperature() {
   // Apply wattage to the element at the right time
   if( ulWattToWindowTime( wattage ) > (millis() - windowStartTime) ) {
     digitalWrite(HEATING_ELEMENT_OUTPUT_PIN,HIGH);
+    bStatusElement = true;
   } else {
     digitalWrite(HEATING_ELEMENT_OUTPUT_PIN,LOW);
+    bStatusElement = false;
   }
 
-#ifdef DEBUG_OFF
+  #ifdef DEBUG_OFF
   //debugPrintFunction("xRegulateTemperature");
   debugPrintVar("difference", difference);
   //debugPrintVar("overTemperature", overTemperature);
@@ -1101,23 +1236,34 @@ bool xRegulateTemperature() {
   //debugPrintVar("millis()", millis());
   //debugPrintVar("windowStartTime", windowStartTime);
   //debugPrintVar("test", ulWattToWindowTime( wattage ) > (millis() - windowStartTime) ); 
-#endif
+  #endif
+}
+
+void xPurgePump() {
+  for(int i = 0; i < 2; i++) {
+    analogWrite(PUMP_PIN, PUMP_SPEED_MAX);  // analogWrite values from 0 to 255
+    delay(1000);
+    analogWrite(PUMP_PIN, PUMP_SPEED_STOP);  // analogWrite values from 0 to 255
+    delay(1500);
+  }
 }
 
 bool xRegulatePumpSpeed() {
-  analogWrite(PUMP_PIN, iPumpSpeed);  // analogWrite values from 0 to 255
+  //  analogWrite(PUMP_PIN, iPumpSpeed);  // analogWrite values from 0 to 255
 
-  if( iPumpSpeed ) {
-    //basePT100.setPower( PT100_BASE_DARLINGTON_ADC_VMAX, PT100_BASE_DARLINGTON_VS );
-    basePT100.setMeasuredTemperatureDeviation( -0.90 );
-    upPT100.setMeasuredTemperatureDeviation( -1.00 );
-    downPT100.setMeasuredTemperatureDeviation( -1.10 );
+  if(basePT100.getCurrentTemperature() > PUMP_TEMPERATURE_MAX_OPERATION) {
+    analogWrite(PUMP_PIN, PUMP_SPEED_STOP);  // analogWrite values from 0 to 255
+
+    basePT100.setSampleDeviation( 0.0 );
+    upPT100.setSampleDeviation( 0.0 );
+    downPT100.setSampleDeviation( 0.0 );
   }
   else {
-    //basePT100.setPower( PT100_BASE_DEFAULT_ADC_VMAX, PT100_BASE_DEFAULT_VS );
-    basePT100.setMeasuredTemperatureDeviation( 0.0 );
-    upPT100.setMeasuredTemperatureDeviation( 0.0 );
-    downPT100.setMeasuredTemperatureDeviation( 0.0 );
+    analogWrite(PUMP_PIN, iPumpSpeed);  // analogWrite values from 0 to 255
+
+    basePT100.setSampleDeviation( -2.0 );
+    upPT100.setSampleDeviation( -2.0 );
+    downPT100.setSampleDeviation( -2.0 );
   }
 }
 
@@ -1125,7 +1271,16 @@ void xWarnClockEnded() {
   sing(MELODY_SUPER_MARIO_START, PIEZO_PIN);
 }
 
+void xWarnCookEnded() {
+  sing(MELODY_UNDERWORLD_SHORT, PIEZO_PIN);
+}
+
 void xStageFirstRun( int stageTime, int stageTemperature, int stagePumpSpeed, eCookingStages stage ) {
+  #ifdef DEBUG_OFF
+  debugPrintFunction("xStageFirstRun");
+  debugPrintVar("cookingStage", stage);
+  #endif
+
   // Set Stage
   bStageFirstRun = true;
   cookingStage = stage;
@@ -1138,85 +1293,188 @@ void xStageFirstRun( int stageTime, int stageTemperature, int stagePumpSpeed, eC
   
   // Reset the clock
   clockStartTime = millis();
+  clockLastUpdate = clockStartTime;
   clockIgnore = 0;
 
   // Set the pump speed
   iPumpSpeed = stagePumpSpeed;
 }
 
-void xTransitionIntoStage_GlobalVariables(eCookingStages nextStage) {
+void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
+  #ifdef DEBUG_OFF
+  debugPrintFunction("xSetupGlobalVariablesForStage");
+  debugPrintVar("cookingStage", nextStage);
+  #endif
 
   // Operate the machine according to the current mode
   switch(nextStage) {
     case eCookingStage_Startpoint: {
+      switch(beerProfile) {
+        case eBeerProfile_Trigo: {
+          float wheatAmount = 0.05 * ((float) finalYield);
+          float pilsnerAmount = 0.2 * ((float) finalYield);
+
+          String say = "Cruch ";
+          say += String(wheatAmount);
+          say += String("Kg of Wheat and ");
+          say += String(pilsnerAmount);
+          say += String("Kg of Pilsner Malt into a pot.");
+
+          xWaitForAction("Malt", say);
+
+          repaint = true;
+
+          break;
+        }
+        default: {
+
+        }
+      }
+
+      // Make sure there is water
+      xWaitForAction("Water", "Make sure there is water in the machine before start cooking.");
+
+      repaint = true;
+
       // A basic operation for a basic stage
-      xStageFirstRun( startpointTime, startpointTemperature, 255, eCookingStage_Startpoint );
+      xStageFirstRun( startpointTime, startpointTemperature, PUMP_SPEED_MAX, eCookingStage_Startpoint );
       
       break;
     }
     case eCookingStage_BetaGlucanase: {
+      switch(beerProfile) {
+        case eBeerProfile_Trigo: {
+          float wheatAmount = 0.05 * ((float) finalYield);
+          float pilsnerAmount = 0.2 * ((float) finalYield);
+
+          String say = "Put ";
+          say += String(wheatAmount);
+          say += String("Kg of Wheat and ");
+          say += String(pilsnerAmount);
+          say += String("Kg of Pilsner Malt in.");
+
+          xWaitForAction("Malt", say);
+
+          repaint = true;
+
+          break;
+        }
+        default: {
+
+        }
+      }
+
       // A basic operation for a basic stage
-      xStageFirstRun( betaGlucanaseTime, betaGlucanaseTemperature, 255, eCookingStage_BetaGlucanase );
+      xStageFirstRun( betaGlucanaseTime, betaGlucanaseTemperature, PUMP_SPEED_MAX, eCookingStage_BetaGlucanase );
       
       break;
     }
     case eCookingStage_Debranching: {
       // A basic operation for a basic stage
-      xStageFirstRun( debranchingTime, debranchingTemperature, 255, eCookingStage_Debranching );
+      xStageFirstRun( debranchingTime, debranchingTemperature, PUMP_SPEED_MAX, eCookingStage_Debranching );
       
       break;
     }
     case eCookingStage_Proteolytic: {
       // A basic operation for a basic stage
-      xStageFirstRun( proteolyticTime, proteolyticTemperature, 255, eCookingStage_Proteolytic );
+      xStageFirstRun( proteolyticTime, proteolyticTemperature, PUMP_SPEED_MAX, eCookingStage_Proteolytic );
       
       break;
     }
     case eCookingStage_BetaAmylase: {
       // A basic operation for a basic stage
-      xStageFirstRun( betaAmylaseTime, betaAmylaseTemperature, 255, eCookingStage_BetaAmylase );
+      xStageFirstRun( betaAmylaseTime, betaAmylaseTemperature, PUMP_SPEED_MAX, eCookingStage_BetaAmylase );
       
       break;
     }
     case eCookingStage_AlphaAmylase: {
       // A basic operation for a basic stage
-      xStageFirstRun( alphaAmylaseTime, alphaAmylaseTemperature, 255, eCookingStage_AlphaAmylase );
+      xStageFirstRun( alphaAmylaseTime, alphaAmylaseTemperature, PUMP_SPEED_MAX, eCookingStage_AlphaAmylase );
       
       break;
     }
     case eCookingStage_Mashout: {
       // A basic operation for a basic stage
-      xStageFirstRun( mashoutTime, mashoutTemperature, 255, eCookingStage_Mashout );
+      xStageFirstRun( mashoutTime, mashoutTemperature, PUMP_SPEED_MAX, eCookingStage_Mashout );
       
       break;
     }
-    case eCookingStage_Recirculation: {
+    case eCookingStage_Recirculation: {// Make sure there is water
+      xWaitForAction("Sparge Water", "Start heating your sparge water.");
+
+      repaint = true;
+
       // A basic operation for a basic stage
-      xStageFirstRun( recirculationTime, recirculationTemperature, 255, eCookingStage_Recirculation );
+      xStageFirstRun( recirculationTime, recirculationTemperature, PUMP_SPEED_MAX, eCookingStage_Recirculation );
       
       break;
     }
     case eCookingStage_Sparge: {
+      // Make sure there is water
+      xWaitForAction("Sparge Water", "Start pouring the sparge water.");
+
+      repaint = true;
+
       // A basic operation for a basic stage
-      xStageFirstRun( spargeTime, spargeTemperature, 255, eCookingStage_Sparge );
+      xStageFirstRun( spargeTime, spargeTemperature, PUMP_SPEED_MAX, eCookingStage_Sparge );
       
       break;
     }
     case eCookingStage_Boil: {
+      switch(beerProfile) {
+        case eBeerProfile_Trigo: {
+          String say = "Get ";
+
+          float hopAmount = 0.8 * ((float) finalYield);
+          say += String(hopAmount);
+
+          say += String("g of Magnum 9.4\% and Styrian Golding 5\% ready.");
+
+          xWaitForAction("Hops", say);
+
+          break;
+        }
+        default: {
+          xWaitForAction("Hops", "Add the hops in the right order, at the right time.");
+
+        }
+      }
+
+      repaint = true;
+
       // A basic operation for a basic stage
-      xStageFirstRun( boilTime, boilTemperature, 255, eCookingStage_Boil );
+      xStageFirstRun( boilTime, boilTemperature, PUMP_SPEED_MAX, eCookingStage_Boil );
       
       break;
     }
     case eCookingStage_Cooling: {
+      // Make sure there is water
+      xWaitForAction("Coil", "Add the coil and connect it to the main water supply.");
+
+      repaint = true;
+
       // A basic operation for a basic stage
-      xStageFirstRun( coolingTime, coolingTemperature, 255, eCookingStage_Cooling );
+      xStageFirstRun( coolingTime, coolingTemperature, PUMP_SPEED_MAX, eCookingStage_Cooling );
+
+      break;
+    }
+    case eCookingStage_Clean: {
+      // Make sure there is water
+      xWaitForAction("Water", "Add 13 liters.");
+
+      // Make sure there is water
+      xWaitForAction("Star San HB", "Add 0.89oz/26ml.");
+
+      repaint = true;
+
+      // A basic operation for a basic stage
+      xStageFirstRun( cleaningTime, cleaningTemperature, PUMP_SPEED_MAX, eCookingStage_Clean );
 
       break;
     }
     case eCookingStage_Purge: {
       // A basic operation for a basic stage
-      xStageFirstRun( 0, 0, 255, eCookingStage_Purge );
+      xStageFirstRun( 0, 0, PUMP_SPEED_MAX, eCookingStage_Purge );
 
       xRegulatePumpSpeed();
 
@@ -1224,19 +1482,14 @@ void xTransitionIntoStage_GlobalVariables(eCookingStages nextStage) {
     }
     case eCookingStage_Done: {
       // A basic operation for a basic stage
-      xStageFirstRun( 0, 0, 0, eCookingStage_Done );
+      xStageFirstRun( 0, 0, PUMP_SPEED_STOP, eCookingStage_Done );
 
       break;
-    }
-    default : {
-      // A basic operation for a basic stage
-      xStageFirstRun( 0, 0, 0, eCookingStage_Done );
     }
   }
 }
 
 void xTransitionIntoStage(eCookingStages nextStage) {
-  
   // Turn off all hardware that can damage itself if the machine is not cooking
   xSafeHardwarePowerOff();    
   
@@ -1244,10 +1497,10 @@ void xTransitionIntoStage(eCookingStages nextStage) {
   xWarnClockEnded();
   
   // Reset global stage variables
-  xTransitionIntoStage_GlobalVariables( nextStage );
+  xSetupGlobalVariablesForStage( nextStage );
 }
 
-void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemperatureRange, eCookingStages nextStage ) {
+void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemperatureRange, eCookingStages nextStage, boolean bAverageUpDown ) {
   if(bStageFirstRun) {
     // Don't run this again
     bStageFirstRun = false;
@@ -1257,7 +1510,7 @@ void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemp
     // When the stage should be skipped
     if( iStageTime == 0) {
       // Continue to the next stage
-      //xTransitionIntoStage_GlobalVariables( nextStage );
+      //xSetupGlobalVariablesForStage( nextStage );
       
       // There is nothing to do, in this stage
       return;
@@ -1268,16 +1521,24 @@ void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemp
     }
   } else {
     // Account for time spent at the target temperature | Input 1: range in ºC within which the target temperature is considered to be reached
-    xCountTheTime( iStageTemperatureRange );
+    #ifdef DEBUG_OFF
+    xCountTheTime( iStageTemperatureRange, false );
+    #else
+    xCountTheTime( iStageTemperatureRange, bAverageUpDown );
+    #endif
     
     if( isTimeLeft() ) {
       // Do temperature control
-      xRegulateTemperature();
+      xRegulateTemperature( bAverageUpDown );
 
       // Do flow control
       xRegulatePumpSpeed();
       
     } else {
+      #ifdef DEBUG_OFF
+      debugPrintFunction("xBasicStageOperation");
+      debugPrintVar("clockCounter", clockCounter);
+      #endif
       // Continue to the next stage
       xTransitionIntoStage( nextStage );
       
@@ -1289,20 +1550,33 @@ void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemp
   return;
 }
 
-void xWarnCookEnded() {
-  sing(MELODY_UNDERWORLD, PIEZO_PIN);
-}
+void xManageMachineSystems() {
 
-void operateMachine() {
+  #ifdef DEBUG
+  Serial.print(millis());
+  Serial.print(",");
+  if(cooking) {
+    Serial.print("1");
+  }
+  else {
+    Serial.print("0");
+  }
+  Serial.print(",");
+  Serial.print(cookTemperature);
+  Serial.print(",");
+  if(bStatusElement) {
+    Serial.print("1");
+  }
+  else {
+    Serial.print("0");
+  }
+  Serial.print(",");
+  #endif
 
   // Measure temperature, for effect
-  //analogWrite(6, 0);
-  //delay(1);
-  basePT100.measure();
-  upPT100.measure();
-  downPT100.measure();
-  Serial.println(" ");
-  //analogWrite(6, iPumpSpeed);
+  basePT100.measure1(false, false);
+  upPT100.measure1(false, false);
+  downPT100.measure1(true, false);
 
   // If cooking is done, return (this is a nice place to double check safety and ensure the cooking parts aren't on.
   if(!cooking) {
@@ -1315,67 +1589,73 @@ void operateMachine() {
   switch(cookingStage) {
     case eCookingStage_Startpoint: {
       // A basic operation for a basic stage
-      xBasicStageOperation( startpointTime, startpointTemperature, 1, eCookingStage_BetaGlucanase );
+      xBasicStageOperation( startpointTime, startpointTemperature, 1, eCookingStage_BetaGlucanase, false);
       
       break;
     }
     case eCookingStage_BetaGlucanase: {
       // A basic operation for a basic stage
-      xBasicStageOperation( betaGlucanaseTime, betaGlucanaseTemperature, 1, eCookingStage_Debranching );
+      xBasicStageOperation( betaGlucanaseTime, betaGlucanaseTemperature, 0, eCookingStage_Debranching, true );
       
       break;
     }
     case eCookingStage_Debranching: {
       // A basic operation for a basic stage
-      xBasicStageOperation( debranchingTime, debranchingTemperature, 1, eCookingStage_Proteolytic );
+      xBasicStageOperation( debranchingTime, debranchingTemperature, 0, eCookingStage_Proteolytic, true );
       
       break;
     }
     case eCookingStage_Proteolytic: {
       // A basic operation for a basic stage
-      xBasicStageOperation( proteolyticTime, proteolyticTemperature, 1, eCookingStage_BetaAmylase );
+      xBasicStageOperation( proteolyticTime, proteolyticTemperature, 0, eCookingStage_BetaAmylase, true );
       
       break;
     }
     case eCookingStage_BetaAmylase: {
       // A basic operation for a basic stage
-      xBasicStageOperation( betaAmylaseTime, betaAmylaseTemperature, 1, eCookingStage_AlphaAmylase );
+      xBasicStageOperation( betaAmylaseTime, betaAmylaseTemperature, 0, eCookingStage_AlphaAmylase, true );
       
       break;
     }
     case eCookingStage_AlphaAmylase: {
       // A basic operation for a basic stage
-      xBasicStageOperation( alphaAmylaseTime, alphaAmylaseTemperature, 1, eCookingStage_Mashout );
+      xBasicStageOperation( alphaAmylaseTime, alphaAmylaseTemperature, 0, eCookingStage_Mashout, true );
       
       break;
     }
     case eCookingStage_Mashout: {
       // A basic operation for a basic stage
-      xBasicStageOperation( mashoutTime, mashoutTemperature, 1, eCookingStage_Recirculation );
+      xBasicStageOperation( mashoutTime, mashoutTemperature, 0, eCookingStage_Recirculation, true );
       
       break;
     }
     case eCookingStage_Recirculation: {
       // A basic operation for a basic stage
-      xBasicStageOperation( recirculationTime, recirculationTemperature, 1, eCookingStage_Sparge );
+      xBasicStageOperation( recirculationTime, recirculationTemperature, 0, eCookingStage_Sparge, true );
       
       break;
     }
     case eCookingStage_Sparge: {
       // A basic operation for a basic stage
-      xBasicStageOperation( spargeTime, spargeTemperature, 1, eCookingStage_Boil );
+      xBasicStageOperation( spargeTime, spargeTemperature, 1, eCookingStage_Boil, false );
       
       break;
     }
     case eCookingStage_Boil: {
       // A basic operation for a basic stage
-      xBasicStageOperation( boilTime, boilTemperature, 1, eCookingStage_Cooling );
+      xBasicStageOperation( boilTime, boilTemperature, 2, eCookingStage_Cooling, false );
       
       break;
     }
     case eCookingStage_Cooling: {
       // A basic operation for a basic stage
-      xBasicStageOperation( coolingTime, coolingTemperature, 1, eCookingStage_Done );
+      xBasicStageOperation( coolingTime, coolingTemperature, 1, eCookingStage_Done, false );
+
+      break;
+    }
+    case eCookingStage_Clean: {
+      // A basic operation for a basic stage
+      xBasicStageOperation( cleaningTime, cleaningTemperature, 1, eCookingStage_Done, false );
 
       break;
     }
@@ -1388,12 +1668,17 @@ void operateMachine() {
 
       break;
     }
-    default : {
-      // Update state
-      cooking = false;
+    case eCookingStage_Done: {
+      // Update cooking state
+      stopBrewing();
+
+      // Ask for screen refresh
+      repaint = true;
       
       // Warn the user that the cooking is done
       xWarnCookEnded();
+
+      break;
     }
   }
 }
@@ -1445,7 +1730,7 @@ int getTimer(int init) {
       break;
     } else {
       // Don't forget to keep an eye on the cooking
-      operateMachine();
+      xManageMachineSystems();
     }
     
     // display current timer
@@ -1500,7 +1785,7 @@ int getTemperature(int init) {
       break;
     } else {
       // Don't forget to keep an eye on the cooking
-      operateMachine();
+      xManageMachineSystems();
     }
     
     // display current timer
@@ -1555,7 +1840,7 @@ int xSetGenericValue(int init, int min, int max, char *valueName, char *unit) {
       break;
     } else {
       // Don't forget to keep an eye on the cooking
-      operateMachine();
+      xManageMachineSystems();
     }
     
     // Check if there was an update by the rotary encoder
@@ -1584,40 +1869,43 @@ int xSetGenericValue(int init, int min, int max, char *valueName, char *unit) {
 
 // ###################### Set Variables ##################################################
 
-void lcdPrint(String title, String message) {
-  int messageLength = message.length();
-  
-  lcd.clear();
-    
-  // print title
-  lcd.home();
-  lcd.print(title);
-    
-  // print message
-  if(messageLength <= LCD_HORIZONTAL_RESOLUTION) {
-    lcd.setCursor(0,LCD_VERTICAL_RESOLUTION-1);
-    lcd.print(message);
-    delay(1000);
-  }
-  // print scrolling message
-  else {
-    String output_message = "                ";
-    output_message += message;
-    messageLength = output_message.length();
-    
-    // Adjust the message size for proper printing
-    if ( messageLength & 1 == 1 ) {
-      output_message+=" ";
-      messageLength+=2;
-    }
-    
-    // print scrolling message
-    for (int cursor = 0; cursor < messageLength - LCD_HORIZONTAL_RESOLUTION; cursor+=2) {
-      lcd.setCursor(0,LCD_VERTICAL_RESOLUTION-1);
-      lcd.print(output_message.substring(cursor, cursor+16));
-      delay(500);
+void xWaitForAction(String title, String message) {
+  while(true) {
+    // Check if pushbutton is pressed
+    if ( digitalRead(ROTARY_ENCODER_SW_PIN) ) {
+      // Wait until switch is released
+      while ( digitalRead(ROTARY_ENCODER_SW_PIN) ) {}  
+      
+      // debounce
+      delay( 10 );
+
+      // Job is done, break the circle
+      break;
+    } else {
+      sing(BUZZ_1, PIEZO_PIN);
+
+      // Print the message
+      if(! lcdPrint(&lcd, title, message)) {
+        break;
+      }
     }
   }
 }
 
+boolean gotButtonPress(int iPin) {
+  boolean ret = false;
 
+  if ((digitalRead(iPin))) {    // check if pushbutton is pressed
+    ret = true;
+    while (digitalRead(iPin)) {}    // wait til switch is released
+    delay(10);                            // debounce
+  } 
+
+  return ret;
+}
+
+void cleanSerialMonitor() {
+  for (int i = 0; i < 40; i++) {
+    Serial.println();
+  }
+}

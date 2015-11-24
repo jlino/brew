@@ -71,6 +71,18 @@ int supermario_tempo[] = {
   12, 12, 12, 12,
 };
 
+//Underworld short melody
+int underworld_melody_short[] = {
+  NOTE_C4, NOTE_C5, NOTE_A3, NOTE_A4,
+  NOTE_AS3, NOTE_AS4
+};
+
+//Underwolrd short tempo
+int underworld_tempo_short[] = {
+  12, 12, 12, 12,
+  12, 12
+};
+
 //Underworld melody
 int underworld_melody[] = {
   NOTE_C4, NOTE_C5, NOTE_A3, NOTE_A4,
@@ -117,6 +129,16 @@ int underworld_tempo[] = {
   3, 3, 3
 };
 
+int buzz_1_melody[] = {
+  NOTE_E7, NOTE_E7, NOTE_E7, NOTE_E7,
+  0, 0, 0, 0,
+};
+//Mario main them tempo
+int buzz_1_tempo[] = {
+  12, 12, 12, 12,
+  12, 12, 12, 12,
+};
+
 int song = 0;
 
 void buzz(int targetPin, long frequency, long length) {
@@ -139,7 +161,7 @@ void sing(int s, int pin) {
   song = s;
 
   switch(song) {
-  	case 1: {
+  	case MELODY_SUPER_MARIO: {
 		int size = sizeof(supermario_melody) / sizeof(int);
 	    for (int thisNote = 0; thisNote < size; thisNote++) {
 	 
@@ -161,7 +183,7 @@ void sing(int s, int pin) {
 	    }
   		break;
   	}
-  	case 2: {
+  	case MELODY_UNDERWORLD: {
 		int size = sizeof(underworld_melody) / sizeof(int);
 	    for (int thisNote = 0; thisNote < size; thisNote++) {
 	 
@@ -183,7 +205,7 @@ void sing(int s, int pin) {
 	    }
   		break;
   	}
-  	case 3: {
+  	case MELODY_SUPER_MARIO_START: {
 		int size = sizeof(supermario_start_melody) / sizeof(int);
 	    for (int thisNote = 0; thisNote < size; thisNote++) {
 	 
@@ -205,6 +227,50 @@ void sing(int s, int pin) {
 	    }
   		break;
   	}
+    case MELODY_UNDERWORLD_SHORT: {
+    int size = sizeof(underworld_melody_short) / sizeof(int);
+      for (int thisNote = 0; thisNote < size; thisNote++) {
+   
+        // to calculate the note duration, take one second
+        // divided by the note type.
+        //e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
+        int noteDuration = 1000 / underworld_tempo_short[thisNote];
+   
+        buzz(pin, underworld_melody_short[thisNote], noteDuration);
+   
+        // to distinguish the notes, set a minimum time between them.
+        // the note's duration + 30% seems to work well:
+        int pauseBetweenNotes = noteDuration * 1.30;
+        delay(pauseBetweenNotes);
+   
+        // stop the tone playing:
+        buzz(pin, 0, noteDuration);
+   
+      }
+      break;
+    }
+    case BUZZ_1: {
+    int size = sizeof(buzz_1_melody) / sizeof(int);
+      for (int thisNote = 0; thisNote < size; thisNote++) {
+   
+        // to calculate the note duration, take one second
+        // divided by the note type.
+        //e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
+        int noteDuration = 1000 / buzz_1_tempo[thisNote];
+   
+        buzz(pin, buzz_1_melody[thisNote], noteDuration);
+   
+        // to distinguish the notes, set a minimum time between them.
+        // the note's duration + 30% seems to work well:
+        int pauseBetweenNotes = noteDuration * 1.30;
+        delay(pauseBetweenNotes);
+   
+        // stop the tone playing:
+        buzz(pin, 0, noteDuration);
+   
+      }
+      break;
+    }
 
   }
 }

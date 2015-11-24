@@ -103,9 +103,11 @@
 // Define a special note, 'R', to represent a rest
 #define  _R     0
 
-#define MELODY_SUPER_MARIO	1
-#define MELODY_UNDERWORLD	2
-#define MELODY_SUPER_MARIO_START	3
+#define MELODY_SUPER_MARIO  1
+#define MELODY_UNDERWORLD 2
+#define MELODY_SUPER_MARIO_START  3
+#define MELODY_UNDERWORLD_SHORT 4
+#define BUZZ_1 5
 
 
 //  melody[] is an array of notes, accompanied by beats[],
