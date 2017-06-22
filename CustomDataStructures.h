@@ -24,8 +24,8 @@ enum eMenuType {
 };
 enum eMainMenuOptions {
 	eMainMenu_NULL,
-  eMainMenu_GO_FROM_STAGE,
   eMainMenu_GO,
+  eMainMenu_GO_FROM_STAGE,
 	eMainMenu_STOP,
 	eMainMenu_SKIP,
 	eMainMenu_BeerProfile,
@@ -109,5 +109,13 @@ enum eBeerProfile {
 	eBeerProfile_APA,
 	eBeerProfile_Custom
 };
+
+typedef struct menuData_ {
+  char *_title;
+  int  _position;
+  int  _selection;
+  char **_dialog;
+  bool _repaint;
+} MenuData;
 
 #endif

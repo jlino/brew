@@ -23,7 +23,7 @@ class Temperature
 {
   public:
 		// Temperature(Temperature_OUTPUT_PIN, Temperature_INPUT_PIN, Temperature_TIME_BETWEEN_READINGS, Temperature_DEFAULT_ADC_VMAX, Temperature_DEFAULT_VS, Temperature_DEFAULT_R1_RESISTENCE, Temperature_DEFAULT_LINE_RESISTENCE, Temperature_DEFAULT_OPERATION_RESISTENCE);
-    Temperature(char *name,
+    Temperature(const char *name,
     				int OutputPin_SensorPower, 
 					int InputPin_TemperatureReading, 
 					int TimeBetweenReadings, 
@@ -40,19 +40,19 @@ class Temperature
 		float setPumpStatus( bool pump );
   
 	private:
-		char			*_name;
-		int 			_OutputPin_SensorPower; 
-		int 			_InputPin_TemperatureReading;
-		int 			_TimeBetweenReadings;
+		const char	*_name;
+		int 			  _OutputPin_SensorPower; 
+		int 			  _InputPin_TemperatureReading;
+		int 			  _TimeBetweenReadings;
 		float 			_m1;
 		float 			_m2;
 		float 			_b1;
 		float 			_b2;
 		
-		float           _temperatureAverage;
-		float           _measuredTemperature;
-		float			_measuredTemperatureDeviation;
-		bool			_pump;
+		float       _temperatureAverage;
+		float       _measuredTemperature;
+		float			  _measuredTemperatureDeviation;
+		bool			  _pump;
 		unsigned long   _lastTemperatureRead;
 		int           	_VoutAnalogSample;
 		int           	_VoutRAnalogSample;

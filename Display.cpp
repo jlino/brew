@@ -164,6 +164,19 @@ boolean displayStatus(LiquidCrystal_I2C *lcd, boolean cooking, float cookTempera
   return ret;
 }
 
+boolean displayGenericMenu( LiquidCrystal_I2C *lcd, MenuData *data ) {
+  boolean repaintRequired = data->_repaint;
+  if(repaintRequired) {
+    lcd->clear();
+    lcd->home ();                   // go home
+    lcd->print(data->_title);
+    lcd->setCursor (0,1);           // go to start of 2nd line
+    lcd->print((data->_dialog)[data->_position]);
+    repaintRequired = false;
+  }
+  return repaintRequired;
+}
+
 boolean displayMainMenu(LiquidCrystal_I2C *lcd, eMainMenuOptions position, boolean repaint) {
   boolean ret = repaint;
 

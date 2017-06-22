@@ -39,6 +39,13 @@ eBeerProfile            beerProfile;
 
 eMenuType               eMenuType;
 
+MenuData                mdMainMenu;
+MenuData                mdStartFromStageMenu;
+MenuData                mdBeerProfileMenu;
+MenuData                mdStageMenu;
+MenuData                mdMaltMenu;
+MenuData                mdSettingsMenu;
+
 eMainMenuOptions        eMainMenuPosition;
 eMainMenuOptions        eMainMenuSelection;
 eStageMenuOptions       eStartFromStageMenuPosition;
@@ -52,12 +59,8 @@ eMaltMenuOptions        eMaltMenuSelection;
 eSettingsMenuOptions    eSettingsMenuPosition;
 eSettingsMenuOptions    eSettingsMenuSelection;
 
-eMaltMenuOptions        maltMenuOption;
-eSettingsMenuOptions    settingsMenuOption;
-
 // ++++++++++++++++++++++++ Global Variables ++++++++++++++++++++++++
 boolean                 cooking;
-boolean                 bStageFirstRun;
 
 unsigned long           clockStartTime;
 unsigned long           clockLastUpdate;
@@ -115,6 +118,8 @@ volatile int            rotaryEncoderMultiStep = 1;
 
 volatile boolean        onISR = false;
 
+unsigned long           rotarySwDetectTime;
+
 // ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
 int                     iWindowSize;             // Time frame to operate in
 unsigned long           windowStartTime;
@@ -127,60 +132,21 @@ int                     iPumpSpeed;             // Time frame to operate in
 // ++++++++++++++++++++++++ Library - LiquidCrystal_I2C ++++++++++++++++++++++++
 LiquidCrystal_I2C       lcd(LCD_I2C_ADDR, LCD_EN_PIN, LCD_RW_PIN, LCD_RS_PIN, LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
 
-/* +++++++++++++++++++++++ PT100 +++++++++++++++++++++++
-PT100                   basePT100("base", 
-                          PT100_BASE_OUTPUT_PIN, 
-                          PT100_BASE_INPUT_PIN, 
-                          PT100_BASE_TIME_BETWEEN_READINGS, 
-                          PT100_BASE_DEFAULT_ADC_VMAX, 
-                          PT100_BASE_DEFAULT_VS, 
-                          PT100_BASE_DEFAULT_R1_RESISTENCE);
-PT100                   upPT100("up", 
-                          PT100_UP_OUTPUT_PIN, 
-                          PT100_UP_INPUT_PIN,  
-                          PT100_UP_TIME_BETWEEN_READINGS, 
-                          PT100_UP_DEFAULT_ADC_VMAX, 
-                          PT100_UP_DEFAULT_VS, 
-                          PT100_UP_DEFAULT_R1_RESISTENCE);
-PT100                   downPT100("down", 
-                          PT100_DOWN_OUTPUT_PIN,  
-                          PT100_DOWN_INPUT_PIN, 
-                          PT100_DOWN_TIME_BETWEEN_READINGS, 
-                          PT100_DOWN_DEFAULT_ADC_VMAX, 
-                          PT100_DOWN_DEFAULT_VS, 
-                          PT100_DOWN_DEFAULT_R1_RESISTENCE);
-*/
-
 // +++++++++++++++++++++++ Temperature +++++++++++++++++++++++
 Temperature                   basePT100("base", 
                           PT100_BASE_OUTPUT_PIN, 
                           PT100_BASE_INPUT_PIN, 
                           PT100_BASE_TIME_BETWEEN_READINGS, 
-                          //2.1028, 2.0907, 659.91, 662.88);
-                          //2.0998, 2.0998, 660.02, 662.02);
-                          //2.0986, 2.0898, 660.06, 662.91);
-                          //2.1353, 2.1043, 661.93, 659.7);
-                          //2.0608, 2.058, 664.26, 661.15);
                           2.0298, 2.0259, 665.24, 662.17);
 Temperature                   upPT100("up", 
                           PT100_UP_OUTPUT_PIN, 
                           PT100_UP_INPUT_PIN,  
                           PT100_UP_TIME_BETWEEN_READINGS, 
-                          //2.0949, 2.0835, 654.67, 657.57);
-                          //2.079, 2.079, 655.52, 657.52);
-                          //2.0893, 2.0832, 654.84, 657.58);
-                          //2.1239, 2.1288, 654.89, 653.44);
-                          //2.0564, 2.0539, 658.51, 655.78);
                           2.0274, 2.0245, 659.43, 656.72);
 Temperature                   downPT100("down", 
                           PT100_DOWN_OUTPUT_PIN,  
                           PT100_DOWN_INPUT_PIN, 
                           PT100_DOWN_TIME_BETWEEN_READINGS, 
-                          //2.1016, 2.09, 653.02, 656.00);
-                          //2.0998, 2.0998, 653.02, 655.02);
-                          //2.0974, 2.0894, 653.17, 656.02);
-                          //2.1347, 2.1407, 654.89, 651.84);
-                          //2.0618, 2.0605, 657.16, 654.35);
                           2.0309, 2.0288, 658.15, 655.35);
 
 // ######################### INTERRUPTS #########################
@@ -349,9 +315,13 @@ void setup() {
   // ++++++++++++++++++++++++ Rotary Encoder ++++++++++++++++++++++++
   // set operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
   xSetupRotaryEncoder             ( eRotaryEncoderMode_Disabled, 0, 0, 0, 0, 0 );
+  rotarySwDetectTime = 0;
 
   // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
   eMenuType                   =   eMenuType_Main;
+
+  mdMainMenu._position        =   eMainMenu_GO;
+  mdMainMenu._selection       =   eMainMenu_NULL;
   
   eMainMenuPosition           =   eMainMenu_GO;
   eMainMenuSelection          =   eMainMenu_NULL;
@@ -369,7 +339,6 @@ void setup() {
   // ++++++++++++++++++++++++ Global Variables ++++++++++++++++++++++++
 
   cooking                     =   false;
-  bStageFirstRun              =   true;
 
   clockStartTime              =   0;
   clockLastUpdate             =   0;
@@ -429,9 +398,9 @@ void setup() {
 // ######################### MAIN LOOP #########################
 
 void loop() {
-  unsigned long inactivityTime = millis() - lastInterruptTime;
+  unsigned long inactivityTime = getInactivityTime();
 
-  if(inactivityTime > SETTING_MAX_INACTIVITY_TIME) {    // Inactivity check
+  if( inactivityTime > SETTING_MAX_INACTIVITY_TIME ) {    // Inactivity check
     if(refresh) {
       repaint = true;
       refresh = false;
@@ -982,67 +951,71 @@ void runBeerProfileSelection() {
   eBeerProfileMenuSelection = eBeerProfileMenu_NULL;
 }
 
-void runStartFromStageSelection_Processor( unsigned long *stageTime, int *stageTemperature, eCookingStages nextStage ) {
-  // Stop anything that might be still going on
-  xSafeHardwarePowerOff();
-
-  finalYield = xSetFinalYield( finalYield );
-  (*stageTime) = getTimer( clockCounter/1000, (*stageTime) );
-  (*stageTemperature) = xSetTemperature( (*stageTemperature) );
-
-  xSetupGlobalVariablesForStage( nextStage );
-
+void xStartStage( unsigned long *stageTime, int *stageTemperature, eCookingStages nextStage, bool bPurgePump, bool bSetFinalYield, bool bSetTime, bool bSetTemperature ) {
+  xSafeHardwarePowerOff();                      // Stop anything that might be still going on
+  
+  if(bSetFinalYield) { finalYield = xSetFinalYield( finalYield ); }
+  if(bSetTime) { (*stageTime) = getTimer( clockCounter/1000, (*stageTime) ); }
+  if(bSetTemperature) { (*stageTemperature) = xSetTemperature( (*stageTemperature) ); }
+  if(bPurgePump) { xPurgePump(); }
+  
   startBrewing();
-
+  xSetupStage( nextStage );
   backToStatus();
+}
 
-  xPurgePump();
+void xStartStageHeadless( eCookingStages nextStage, bool bPurgePump ) {
+  xStartStage( NULL, NULL, nextStage, bPurgePump, false, false, false );
+}
+
+void xStartStageInteractive( unsigned long *stageTime, int *stageTemperature, eCookingStages nextStage ) {
+  xStartStage( stageTime, stageTemperature, nextStage, true, true, true, true );
 }
 
 void runStartFromStageSelection() {
   switch(eStartFromStageMenuSelection) {
     case eStageMenu_Startpoint: {
-      runStartFromStageSelection_Processor( &startpointTime, &startpointTemperature, eCookingStage_Startpoint );
+      xStartStageInteractive( &startpointTime, &startpointTemperature, eCookingStage_Startpoint );
       break;
     }
     case eStageMenu_BetaGlucanase: {
-      runStartFromStageSelection_Processor( &betaGlucanaseTime, &betaGlucanaseTemperature, eCookingStage_BetaGlucanase );
+      xStartStageInteractive( &betaGlucanaseTime, &betaGlucanaseTemperature, eCookingStage_BetaGlucanase );
       break;
     }
     case eStageMenu_Debranching: {
-      runStartFromStageSelection_Processor( &debranchingTime, &debranchingTemperature, eCookingStage_Debranching );
+      xStartStageInteractive( &debranchingTime, &debranchingTemperature, eCookingStage_Debranching );
       break;
     }
     case eStageMenu_Proteolytic: {
-      runStartFromStageSelection_Processor( &proteolyticTime, &proteolyticTemperature, eCookingStage_Proteolytic );
+      xStartStageInteractive( &proteolyticTime, &proteolyticTemperature, eCookingStage_Proteolytic );
       break;
     }
     case eStageMenu_BetaAmylase: {
-      runStartFromStageSelection_Processor( &betaAmylaseTime, &betaAmylaseTemperature, eCookingStage_BetaAmylase );
+      xStartStageInteractive( &betaAmylaseTime, &betaAmylaseTemperature, eCookingStage_BetaAmylase );
       break;
     }
     case eStageMenu_AlphaAmylase: {
-      runStartFromStageSelection_Processor( &alphaAmylaseTime, &alphaAmylaseTemperature, eCookingStage_AlphaAmylase );
+      xStartStageInteractive( &alphaAmylaseTime, &alphaAmylaseTemperature, eCookingStage_AlphaAmylase );
       break;
     }
     case eStageMenu_Mashout: {
-      runStartFromStageSelection_Processor( &mashoutTime, &mashoutTemperature, eCookingStage_Mashout );
+      xStartStageInteractive( &mashoutTime, &mashoutTemperature, eCookingStage_Mashout );
       break;
     }
     case eStageMenu_Recirculation: {
-      runStartFromStageSelection_Processor( &recirculationTime, &recirculationTemperature, eCookingStage_Recirculation );
+      xStartStageInteractive( &recirculationTime, &recirculationTemperature, eCookingStage_Recirculation );
       break;
     }
     case eStageMenu_Sparge: {
-      runStartFromStageSelection_Processor( &spargeTime, &spargeTemperature, eCookingStage_Sparge );
+      xStartStageInteractive( &spargeTime, &spargeTemperature, eCookingStage_Sparge );
       break;
     }
     case eStageMenu_Boil: {
-      runStartFromStageSelection_Processor( &boilTime, &boilTemperature, eCookingStage_Boil );
+      xStartStageInteractive( &boilTime, &boilTemperature, eCookingStage_Boil );
       break;
     }
     case eStageMenu_Cooling: {
-      runStartFromStageSelection_Processor( &coolingTime, &coolingTemperature, eCookingStage_Cooling );
+      xStartStageInteractive( &coolingTime, &coolingTemperature, eCookingStage_Cooling );
       break;
     }
     case eStageMenu_Back: {
@@ -1057,131 +1030,78 @@ void runStartFromStageSelection() {
 
 void runMainMenuSelection() {
   switch(eMainMenuSelection) {
+    case eMainMenu_GO: {
+      xStartStage( NULL, NULL, eCookingStage_Startpoint, true, true, false, false );
+      break;
+    }
     case eMainMenu_GO_FROM_STAGE: {
       eMenuType = eMenuType_StartFromStage;
       repaint = true;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
       xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eBeerProfileMenuPosition, MENU_SIZE_PROFILES_MENU - 1, 1, 1, 0 );
-      
-      break;
-    }
-    case eMainMenu_GO: {
-      finalYield = xSetFinalYield( finalYield );
-
-      startBrewing();
-
-      xSetupGlobalVariablesForStage( eCookingStage_Startpoint );
-
-      backToStatus();
-      
-      xPurgePump();
-
       break;
     }
     case eMainMenu_STOP: {
       stopBrewing();
-
       backToStatus();
-      
       break;
     }
     case eMainMenu_SKIP: {
       cookTime = 0;
-
       backToStatus();
-      
       break;
     }
     case eMainMenu_BeerProfile: {
       eMenuType = eMenuType_BeerProfile;
       repaint = true;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
       xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eBeerProfileMenuPosition, MENU_SIZE_PROFILES_MENU - 1, 1, 1, 0 );
-      
       break;
     }
     case eMainMenu_Stage: {
       eMenuType = eMenuType_Stage;
       repaint = true;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
       xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eStageMenuPosition, MENU_SIZE_STAGE_MENU - 1, 1, 1, 0 );
-      
       break;
     }
     case eMainMenu_Malt: {
       eMenuType = eMenuType_Malt;
       repaint = true;
-      
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
       xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eMaltMenuPosition, MENU_SIZE_MALT_MENU - 1, 1, 1, 0 );
-      
       break;
     }
     case eMainMenu_Hops: {
       backToStatus();
-      
       break;
     }
     case eMainMenu_Clean: {
-      // Stop anything that might be still going on
-      xSafeHardwarePowerOff();
-
-      // Start at the Clean stage
-      startBrewing();
-
-      xSetupGlobalVariablesForStage( eCookingStage_Clean );
-
-      backToStatus();
-      
-      xPurgePump();
-
+      xStartStageHeadless( eCookingStage_Clean, true );
       break;
     }
     case eMainMenu_Purge: {
-      // Stop anything that might be still going on
-      xSafeHardwarePowerOff();
-
-      // Start at the Purge stage
-      startBrewing();
-
-      xSetupGlobalVariablesForStage( eCookingStage_Purge );
-
-      backToStatus();
-      
-      xPurgePump();
-
+      xStartStageHeadless( eCookingStage_Purge, true );
       break;
     }
     case eMainMenu_Settings: {
       eMenuType = eMenuType_Settings;
       repaint = true;
-
-      // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
       xSetupRotaryEncoder( eRotaryEncoderMode_Menu, eSettingsMenuPosition, MENU_SIZE_SETTINGS_MENU - 1, 1, 1, 0 );
-      
       break;
     }
     case eMainMenu_Back: {
       backToStatus();
-
       break;
     }
     default: {
     }
   }
-
   eMainMenuSelection = eMainMenu_NULL;
 }
 
-void xCountTheTime( int temperatureRange, boolean bAverageUpDown ) {
+void xCountTheTime( int temperatureMarginRange, boolean bMaximumOfUpDown ) {
   unsigned long now = millis();
-  unsigned long elapsedTime = now - clockLastUpdate;
+
+  // Get current maximum sensed temperaure
   double temperatureCount = 0;
-  
-  if( bAverageUpDown ) {
+  if( bMaximumOfUpDown ) {
     float tup = upPT100.getCurrentTemperature();
     float tdown = downPT100.getCurrentTemperature();
     if(tup > tdown) {
@@ -1194,28 +1114,16 @@ void xCountTheTime( int temperatureRange, boolean bAverageUpDown ) {
     temperatureCount = basePT100.getCurrentTemperature();
   }
 
-  // Check if the machine is in the right temperature range, for the current mode,
-  //if(!( temperatureCount > (cookTemperature - temperatureRange) && temperatureCount < (cookTemperature + temperatureRange))) {
-  float margin = temperatureRange;
-/*  if( cookTemperature >= 100.0 ) {
-    margin = 2.0;
-  }*/
-
-  if( temperatureCount < (cookTemperature - margin) ) {
+  // Ignote time ticks if temperature is not within the acceptable margin for this stage
+  unsigned long elapsedTime = now - clockLastUpdate;
+  if( temperatureCount < (cookTemperature - temperatureMarginRange) ) {
     clockIgnore += elapsedTime;
   }
-  /*else {
-    if( (temperatureCount >= (cookTemperature - margin)) && (temperatureCount < cookTemperature ) {
-      clockIgnore += elapsedTime / margin * (cookTemperature - temperatureCount) ;
-    }
-    else {
-      
-    }
-  }*/
   
   // Calculate the remaining time on the clock
-  clockCounter = cookTime * 1000 - (now - clockStartTime - clockIgnore);
+  clockCounter = cookTime * 1000 - (elapsedTime - clockIgnore);
 
+  // Don't let clock get bellow 0
   if ( clockCounter < 0 ) {
     clockCounter = 0;
   }
@@ -1245,7 +1153,7 @@ double ulWattToWindowTime( double ulAppliedWatts ) {
   return (double)iWindowSize / 1000.0 * ulPulsesRequired * 1000.0 / HEATING_ELEMENT_AC_FREQUENCY_HZ;
 }
 
-bool xRegulateTemperature( boolean bAverageUpDown ) {
+bool xRegulateTemperature( boolean bMaximumOfUpDown ) {
   double difference = 0;
   bool overTemperature = false;
   double wattage = 0.0;
@@ -1254,7 +1162,7 @@ bool xRegulateTemperature( boolean bAverageUpDown ) {
   float tdown = downPT100.getCurrentTemperature();
   float tbase = basePT100.getCurrentTemperature();
 
-  if( bAverageUpDown ) {
+  if( bMaximumOfUpDown ) {
     if(tup > tdown) {
       difference = cookTemperature - tup;
     }
@@ -1386,34 +1294,27 @@ void xWarnCookEnded() {
   sing(MELODY_UNDERWORLD_SHORT, PIEZO_PIN);
 }
 
-void xStageFirstRun( int stageTime, int stageTemperature, int stagePumpSpeed, eCookingStages stage ) {
+void xPrepareForStage( int stageTime, int stageTemperature, int stagePumpSpeed, eCookingStages stage ) {
   #ifdef DEBUG_OFF
-  debugPrintFunction("xStageFirstRun");
+  debugPrintFunction("xPrepareForStage");
   debugPrintVar("cookingStage", stage);
   #endif
 
-  // Set Stage
-  bStageFirstRun = true;
-  cookingStage = stage;
-
-  // Set the clock
-  cookTime = stageTime;
-  
-  // Set the target temperature
-  cookTemperature = stageTemperature;
-  
   // Reset the clock
-  clockStartTime = millis();
-  clockLastUpdate = clockStartTime;
-  clockIgnore = 0;
+  unsigned long now = millis();
+  clockStartTime  = now;
+  clockLastUpdate = now;
+  clockIgnore     = 0;
 
-  // Set the pump speed
-  iPumpSpeed = stagePumpSpeed;
+  iPumpSpeed      = stagePumpSpeed;         // Set the pump speed
+  cookingStage    = stage;                  // Set Stage
+  cookTime        = stageTime;              // Set the clock
+  cookTemperature = stageTemperature;       // Set the target temperature
 }
 
-void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
+void xSetupStage(eCookingStages nextStage) {
   #ifdef DEBUG_OFF
-  debugPrintFunction("xSetupGlobalVariablesForStage");
+  debugPrintFunction("xSetupStage");
   debugPrintVar("cookingStage", nextStage);
   #endif
 
@@ -1424,7 +1325,6 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
         case eBeerProfile_Trigo: {
           float wheatAmount = 0.05 * ((float) finalYield);
           float pilsnerAmount = 0.2 * ((float) finalYield);
-
           String say = "Cruch ";
           say += String(wheatAmount);
           say += String("Kg of Wheat and ");
@@ -1432,9 +1332,7 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
           say += String("Kg of Pilsner Malt into a pot.");
 
           xWaitForAction("Malt", say);
-
           repaint = true;
-
           break;
         }
         case eBeerProfile_IPA: {
@@ -1442,7 +1340,6 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
           float wheatAmount = 0.060526316 * ((float) finalYield);
           float pilsnerAmount = 0.115789474 * ((float) finalYield);
           float munichAmount = 0.028947368 * ((float) finalYield);
-
           String say = "Cruch ";
           say += String(caramelAmount);
           say += String("Kg of Caramel 120, ");
@@ -1454,9 +1351,7 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
           say += String("Kg of Munich into a pot.");
 
           xWaitForAction("Malt", say);
-
           repaint = true;
-
           break;
         }
         default: {
@@ -1468,10 +1363,7 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
       xWaitForAction("Water", "Make sure there is water in the machine before start cooking.");
 
       repaint = true;
-
-      // A basic operation for a basic stage
-      xStageFirstRun( startpointTime, startpointTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Startpoint );
-      
+      xPrepareForStage( startpointTime, startpointTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Startpoint );
       break;
     }
     case eCookingStage_BetaGlucanase: {
@@ -1479,17 +1371,14 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
         case eBeerProfile_Trigo: {
           float wheatAmount = 0.05 * ((float) finalYield);
           float pilsnerAmount = 0.2 * ((float) finalYield);
-
           String say = "Put ";
           say += String(wheatAmount);
           say += String("Kg of Wheat and ");
           say += String(pilsnerAmount);
           say += String("Kg of Pilsner Malt in.");
-
+          
           xWaitForAction("Malt", say);
-
           repaint = true;
-
           break;
         }
         case eBeerProfile_IPA: {
@@ -1497,7 +1386,6 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
           float wheatAmount = 0.060526316 * ((float) finalYield);
           float pilsnerAmount = 0.115789474 * ((float) finalYield);
           float munichAmount = 0.028947368 * ((float) finalYield);
-
           String say = "Cruch ";
           say += String(caramelAmount);
           say += String("Kg of Caramel 120, ");
@@ -1509,70 +1397,44 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
           say += String("Kg of Munich into a pot.");
 
           xWaitForAction("Malt", say);
-
           repaint = true;
-
           break;
         }
-        default: {
-
-        }
+        default: {}
       }
-
-      // A basic operation for a basic stage
-      xStageFirstRun( betaGlucanaseTime, betaGlucanaseTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_BetaGlucanase );
-      
+      xPrepareForStage( betaGlucanaseTime, betaGlucanaseTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_BetaGlucanase );
       break;
     }
     case eCookingStage_Debranching: {
-      // A basic operation for a basic stage
-      xStageFirstRun( debranchingTime, debranchingTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Debranching );
-      
+      xPrepareForStage( debranchingTime, debranchingTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Debranching );
       break;
     }
     case eCookingStage_Proteolytic: {
-      // A basic operation for a basic stage
-      xStageFirstRun( proteolyticTime, proteolyticTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Proteolytic );
-      
+      xPrepareForStage( proteolyticTime, proteolyticTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Proteolytic );
       break;
     }
     case eCookingStage_BetaAmylase: {
-      // A basic operation for a basic stage
-      xStageFirstRun( betaAmylaseTime, betaAmylaseTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_BetaAmylase );
-      
+      xPrepareForStage( betaAmylaseTime, betaAmylaseTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_BetaAmylase );
       break;
     }
     case eCookingStage_AlphaAmylase: {
-      // A basic operation for a basic stage
-      xStageFirstRun( alphaAmylaseTime, alphaAmylaseTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_AlphaAmylase );
-      
+      xPrepareForStage( alphaAmylaseTime, alphaAmylaseTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_AlphaAmylase );
       break;
     }
     case eCookingStage_Mashout: {
-      // A basic operation for a basic stage
-      xStageFirstRun( mashoutTime, mashoutTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Mashout );
-      
+      xPrepareForStage( mashoutTime, mashoutTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Mashout );
       break;
     }
-    case eCookingStage_Recirculation: {// Make sure there is water
+    case eCookingStage_Recirculation: {
       xWaitForAction("Sparge Water", "Start heating your sparge water.");
-
       repaint = true;
-
-      // A basic operation for a basic stage
-      xStageFirstRun( recirculationTime, recirculationTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Recirculation );
-      
+      xPrepareForStage( recirculationTime, recirculationTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Recirculation );
       break;
     }
     case eCookingStage_Sparge: {
-      // Make sure there is water
       xWaitForAction("Sparge Water", "Start pouring the sparge water.");
-
       repaint = true;
-
-      // A basic operation for a basic stage
-      xStageFirstRun( spargeTime, spargeTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Sparge );
-      
+      xPrepareForStage( spargeTime, spargeTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Sparge );
       break;
     }
     case eCookingStage_Boil: {
@@ -1610,7 +1472,7 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
       repaint = true;
 
       // A basic operation for a basic stage
-      xStageFirstRun( boilTime, boilTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Boil );
+      xPrepareForStage( boilTime, boilTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Boil );
       
       break;
     }
@@ -1621,7 +1483,7 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
       repaint = true;
 
       // A basic operation for a basic stage
-      xStageFirstRun( coolingTime, coolingTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Cooling );
+      xPrepareForStage( coolingTime, coolingTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Cooling );
 
       break;
     }
@@ -1635,13 +1497,13 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
       repaint = true;
 
       // A basic operation for a basic stage
-      xStageFirstRun( cleaningTime, cleaningTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Clean );
+      xPrepareForStage( cleaningTime, cleaningTemperature, PUMP_SPEED_MAX_MOSFET, eCookingStage_Clean );
 
       break;
     }
     case eCookingStage_Purge: {
       // A basic operation for a basic stage
-      xStageFirstRun( 0, 0, PUMP_SPEED_MAX_MOSFET, eCookingStage_Purge );
+      xPrepareForStage( 0, 0, PUMP_SPEED_MAX_MOSFET, eCookingStage_Purge );
 
       xRegulatePumpSpeed();
 
@@ -1649,7 +1511,7 @@ void xSetupGlobalVariablesForStage(eCookingStages nextStage) {
     }
     case eCookingStage_Done: {
       // A basic operation for a basic stage
-      xStageFirstRun( 0, 0, PUMP_SPEED_STOP_MOSFET, eCookingStage_Done );
+      xPrepareForStage( 0, 0, PUMP_SPEED_STOP_MOSFET, eCookingStage_Done );
 
       break;
     }
@@ -1664,56 +1526,36 @@ void xTransitionIntoStage(eCookingStages nextStage) {
   xWarnClockEnded();
   
   // Reset global stage variables
-  xSetupGlobalVariablesForStage( nextStage );
+  xSetupStage( nextStage );
 }
 
-void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemperatureRange, eCookingStages nextStage, boolean bAverageUpDown ) {
-  if(bStageFirstRun) {
-    // Don't run this again
-    bStageFirstRun = false;
+void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemperatureRange, eCookingStages nextStage, boolean bMaximumOfUpDown ) {
 
-    //xStageFirstRun( iStageTime, iStageTemperature, 255 );
+  // Account for time spent at the target temperature | Input 1: range in ºC within which the target temperature is considered to be reached
+  #ifdef DEBUG_OFF
+  xCountTheTime( iStageTemperatureRange, false );
+  #else
+  xCountTheTime( iStageTemperatureRange, bMaximumOfUpDown );
+  #endif
+  
+  if( isTimeLeft() ) {
+    // Do temperature control
+    xRegulateTemperature( bMaximumOfUpDown );
+
+    // Do flow control
+    xRegulatePumpSpeed();
     
-    // When the stage should be skipped
-    if( iStageTime == 0) {
-      // Continue to the next stage
-      //xSetupGlobalVariablesForStage( nextStage );
-      
-      // There is nothing to do, in this stage
-      return;
-    } else {
-      // Set the clock, target temperature and Reset the clock
-      //xStageFirstRun( iStageTime, iStageTemperature, PUMP_SPEED_SLOW );
-      //xStageFirstRun( iStageTime, iStageTemperature, 255 );
-    }
   } else {
-    // Account for time spent at the target temperature | Input 1: range in ºC within which the target temperature is considered to be reached
     #ifdef DEBUG_OFF
-    xCountTheTime( iStageTemperatureRange, false );
-    #else
-    xCountTheTime( iStageTemperatureRange, bAverageUpDown );
+    debugPrintFunction("xBasicStageOperation");
+    debugPrintVar("clockCounter", clockCounter);
     #endif
     
-    if( isTimeLeft() ) {
-      // Do temperature control
-      xRegulateTemperature( bAverageUpDown );
-
-      // Do flow control
-      xRegulatePumpSpeed();
-      
-    } else {
-      #ifdef DEBUG_OFF
-      debugPrintFunction("xBasicStageOperation");
-      debugPrintVar("clockCounter", clockCounter);
-      #endif
-      // Continue to the next stage
-      xTransitionIntoStage( nextStage );
-      
-      // There is nothing to do, in this stage
-      return;
-    }
+    // Continue to the next stage, there is nothing to do, in this stage
+    xTransitionIntoStage( nextStage );
+    return;
   }
-  // There is nothing to do, in this iteration
+  
   return;
 }
 
@@ -2010,7 +1852,7 @@ int getTemperature(int initialValue) {
   return rotaryEncoderVirtualPosition;
 }
 
-int xSetGenericValue(int initialValue, int minimumValue, int maximumValue, char *valueName, char *unit) {  
+int xSetGenericValue(int initialValue, int minimumValue, int maximumValue, const char *valueName, const char *unit) {  
   // set operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
   xSetupRotaryEncoder( eRotaryEncoderMode_Generic, initialValue, maximumValue, minimumValue, 1, 5 );
 
@@ -2072,6 +1914,29 @@ int xSetTemperature( int initialValue ) {
 
 int xSetFinalYield( int initialValue ) {  
   return xSetGenericValue( initialValue, SETTING_MACHINE_YIELD_CAPACITY_MIN, SETTING_MACHINE_YIELD_CAPACITY_MAX, "Final Yield", "l" );
+}
+
+unsigned long getInactivityTime() {
+  unsigned long now = millis();
+  unsigned long rotaryEncoderInactivityTime = now - lastInterruptTime;
+
+  if(rotaryEncoderInactivityTime > SETTING_MAX_INACTIVITY_TIME) {
+    if (digitalRead(ROTARY_ENCODER_SW_PIN)) {
+        while(digitalRead(ROTARY_ENCODER_SW_PIN)) {
+          delay(ROTARY_ENCODER_SW_DEBOUNCE_TIME);
+        }
+        
+        now = millis();
+        rotaryEncoderInactivityTime = now - lastInterruptTime;
+        rotarySwDetectTime = now;
+        
+        repaint = true;
+        refresh = true;
+    }
+  }
+  
+  unsigned long switchInactivityTime = now - rotarySwDetectTime;
+  return rotaryEncoderInactivityTime > switchInactivityTime ? switchInactivityTime : rotaryEncoderInactivityTime ;
 }
 
 // ###################### Set Variables ##################################################

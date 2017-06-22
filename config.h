@@ -78,6 +78,7 @@
 #define ROTARY_ENCODER_DT_PIN                     22    // Used for reading DT signal
 #define ROTARY_ENCODER_SW_PIN                     23    // Used for the push button switch
 #define ROTARY_ENCODER_DEBOUNCE_TIME              50 //20    // Number of miliseconds to ignore new signals a signal is received
+#define ROTARY_ENCODER_SW_DEBOUNCE_TIME           10 //20    // Number of miliseconds to ignore new signals a signal is received
 
 // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
 #define SETTING_WELCOME_TIMEOUT                   100

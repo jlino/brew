@@ -6,7 +6,7 @@
 #include "Arduino.h"
 #include "Temperature.h"
 
-Temperature::Temperature(char *name,
+Temperature::Temperature(const char *name,
                     int OutputPin_SensorPower, 
                     int InputPin_TemperatureReading, 
                     int TimeBetweenReadings, 

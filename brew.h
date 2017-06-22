@@ -21,7 +21,11 @@ void runStageSelection();
 
 void runBeerProfileSelection();
 
-void runStartFromStageSelection_Processor( unsigned long *stageTime, int *stageTemperature, eCookingStages nextStage );
+void xStartStage( unsigned long *stageTime, int *stageTemperature, eCookingStages nextStage, bool bPurgePump, bool bSetFinalYield, bool bSetTime, bool bSetTemperature );
+
+void xStartStageHeadless( eCookingStages nextStage, bool bPurgePump );
+
+void xStartStageInteractive( unsigned long *stageTime, int *stageTemperature, eCookingStages nextStage );
 
 void runStartFromStageSelection();
 
@@ -43,9 +47,9 @@ void xWarnClockEnded();
 
 void xWarnCookEnded();
 
-void xStageFirstRun( int stageTime, int stageTemperature, int stagePumpSpeed, eCookingStages stage );
+void xPrepareForStage( int stageTime, int stageTemperature, int stagePumpSpeed, eCookingStages stage );
 
-void xSetupGlobalVariablesForStage(eCookingStages nextStage);
+void xSetupStage(eCookingStages nextStage);
 
 void xTransitionIntoStage(eCookingStages nextStage);
 
@@ -71,11 +75,13 @@ int getTimer( int initialValue );
 
 int getTemperature(int initialValue);
 
-int xSetGenericValue(int initialValue, int minimumValue, int maximumValue, char *valueName, char *unit);
+int xSetGenericValue(int initialValue, int minimumValue, int maximumValue, const char *valueName, const char *unit);
 
 int xSetTemperature( int initialValue );
 
 int xSetFinalYield( int initialValue );
+
+unsigned long getInactivityTime();
 
 // ###################### Set Variables ##################################################
 
