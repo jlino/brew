@@ -5,7 +5,7 @@
 */
 
 #ifndef DEBUG_h
-#define DEBUB_h
+#define DEBUG_h
 
 // ######################### TEMPLATES #########################
 template <class T> void debugPrintVar( char *name, const T& value );

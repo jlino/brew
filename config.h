@@ -8,8 +8,10 @@
 #define CONFIG_h
 
 // ######################### SETTINGS #########################
-#define SETTING_CLEANING_TIME					  1200 //1200
+#define SETTING_CLEANING_TIME					      1200 //1200
 #define SETTING_CLEANING_TEMPERATURE			  45 //45
+#define SETTING_MACHINE_YIELD_CAPACITY_MIN  0
+#define SETTING_MACHINE_YIELD_CAPACITY_MAX  50
 
 // ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
 #define HEATING_ELEMENT_DEFAULT_WINDOW_SIZE       1000
@@ -20,22 +22,24 @@
 #define HEATING_ELEMENT_AC_FREQUENCY_HZ           50.0
 
 // ++++++++++++++++++++++++ Temperature ++++++++++++++++++++++++
+#define TEMPERATURE_MIN_VALUE                     0
+#define TEMPERATURE_MAX_VALUE                     120
 #define PT100_BASE_INPUT_PIN                      A4
 #define PT100_BASE_OUTPUT_PIN                     32
-#define PT100_BASE_INPUT_R_PIN                    A7
-#define PT100_BASE_OUTPUT_R_PIN                   7
+//#define PT100_BASE_INPUT_R_PIN                    A7
+//#define PT100_BASE_OUTPUT_R_PIN                   7
 #define PT100_BASE_TIME_BETWEEN_READINGS          1
 #define PT100_UP_INPUT_PIN                        A5
 #define PT100_UP_OUTPUT_PIN                       30
-#define PT100_UP_INPUT_R_PIN                      A8
-#define PT100_UP_OUTPUT_R_PIN                     9
+//#define PT100_UP_INPUT_R_PIN                      A8
+//#define PT100_UP_OUTPUT_R_PIN                     9
 #define PT100_UP_TIME_BETWEEN_READINGS            1
 #define PT100_DOWN_INPUT_PIN                      A6
 #define PT100_DOWN_OUTPUT_PIN                     31
-#define PT100_DOWN_INPUT_R_PIN                    A9
-#define PT100_DOWN_OUTPUT_R_PIN                   8
+//#define PT100_DOWN_INPUT_R_PIN                    A9
+//#define PT100_DOWN_OUTPUT_R_PIN                   8
 #define PT100_DOWN_TIME_BETWEEN_READINGS          1
-
+/*
 #define PT100_BASE_DEFAULT_ADC_VMAX               1.1
 #define PT100_BASE_DEFAULT_VS                     5.0
 #define PT100_BASE_DEFAULT_R1_RESISTENCE          605.2
@@ -48,6 +52,7 @@
 #define PT100_DOWN_DEFAULT_VS                     5.0
 #define PT100_DOWN_DEFAULT_R1_RESISTENCE          616.0
 #define PT100_DOWN_DEFAULT_R2_RESISTENCE          611.0
+*/
 
 // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
 //#define MIXER_PIN     12
@@ -60,9 +65,11 @@
 #define PUMP_PIN                                  6
 #define PUMP_TEMPERATURE_MAX_OPERATION            90
 #define PUMP_SPEED_STOP                           0
+#define PUMP_SPEED_STOP_MOSFET                    255
 #define PUMP_SPEED_SLOW                           64
 #define PUMP_SPEED_AVERAGE                        128
 #define PUMP_SPEED_FAST                           192
+#define PUMP_SPEED_MAX_MOSFET                     0
 #define PUMP_SPEED_MAX                            255
 
 // ++++++++++++++++++++++++ Rotary Encoder ++++++++++++++++++++++++
@@ -75,11 +82,13 @@
 // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
 #define SETTING_WELCOME_TIMEOUT                   100
 #define SETTING_MAX_INACTIVITY_TIME               3000
-#define MENU_SIZE_MAIN_MENU                       12
+#define MENU_SIZE_MAIN_MENU                       13
 #define MENU_SIZE_PROFILES_MENU                   9
 #define MENU_SIZE_STAGE_MENU                      13
 #define MENU_SIZE_MALT_MENU                    	  4
-#define MENU_SIZE_SETTINGS_MENU                   5
+#define MENU_SIZE_SETTINGS_MENU                   6
+
+// ++++++++++++++++++++++++ Serial Monotor ++++++++++++++++++++++++
 #define SETTING_SERIAL_MONITOR_BAUD_RATE          9600
 #define SETTING_SERIAL_MONITOR_WELCOME_MESSAGE    "Let's start Brewing!"
 

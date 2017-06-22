@@ -16,6 +16,7 @@ enum eRotaryEncoderMode {
 // menu
 enum eMenuType {
 	eMenuType_Main,
+  eMenuType_StartFromStage,
 	eMenuType_BeerProfile,
 	eMenuType_Stage,
 	eMenuType_Malt,
@@ -23,7 +24,8 @@ enum eMenuType {
 };
 enum eMainMenuOptions {
 	eMainMenu_NULL,
-	eMainMenu_GO,
+  eMainMenu_GO_FROM_STAGE,
+  eMainMenu_GO,
 	eMainMenu_STOP,
 	eMainMenu_SKIP,
 	eMainMenu_BeerProfile,
@@ -53,15 +55,15 @@ enum eStageMenuOptions {
 };
 
 enum eBeerProfileMenuOptions {
-	eBeerProfileMenu_NULL,
-	eBeerProfileMenu_Basic,
-	eBeerProfileMenu_Trigo,
-	eBeerProfileMenu_IPA,
-	eBeerProfileMenu_Belga,
-	eBeerProfileMenu_Red,
-	eBeerProfileMenu_APA,
-	eBeerProfileMenu_Custom,
-	eBeerProfileMenu_Back
+  eBeerProfileMenu_NULL,
+  eBeerProfileMenu_Basic,
+  eBeerProfileMenu_Trigo,
+  eBeerProfileMenu_IPA,
+  eBeerProfileMenu_Belga,
+  eBeerProfileMenu_Red,
+  eBeerProfileMenu_APA,
+  eBeerProfileMenu_Custom,
+  eBeerProfileMenu_Back
 };
 
 enum eMaltMenuOptions {
@@ -73,6 +75,7 @@ enum eMaltMenuOptions {
 
 enum eSettingsMenuOptions {
 	eSettingsMenu_NULL,
+	eSettingsMenu_Pump,
 	eSettingsMenu_PT100_Element,
 	eSettingsMenu_PT100_Up,
 	eSettingsMenu_PT100_Down,

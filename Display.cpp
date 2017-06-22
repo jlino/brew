@@ -174,6 +174,11 @@ boolean displayMainMenu(LiquidCrystal_I2C *lcd, eMainMenuOptions position, boole
     lcd->print("Brewery Menu");
     
     switch(position) {
+      case eMainMenu_GO_FROM_STAGE: {
+        lcd->setCursor (0,1);        // go to start of 2nd line
+        lcd->print("-> GO FROM STAGE");
+        break;
+      }
       case eMainMenu_GO: {
         lcd->setCursor (0,1);        // go to start of 2nd line
         lcd->print("-> GO           ");

@@ -1,0 +1,181 @@
+/*
+  Temperature.cpp - Library for measuring temperature with a Temperature.
+  Created by João Lino, December 22, 2015.
+  Released into the public domain.
+*/
+#include "Arduino.h"
+#include "Temperature.h"
+
+Temperature::Temperature(char *name,
+                    int OutputPin_SensorPower, 
+                    int InputPin_TemperatureReading, 
+					int TimeBetweenReadings) {
+	
+    _name                              =   name;
+    _OutputPin_SensorPower             =   OutputPin_SensorPower;
+    _InputPin_TemperatureReading       =   InputPin_TemperatureReading;
+	_TimeBetweenReadings               =   TimeBetweenReadings;
+	_ADCVmax                           =   ADCVmax;
+	
+	_temperatureAverage	               =   24.0;
+	_measuredTemperature               =   24.0;
+	_lastTemperatureRead               =   0;
+	_VoutAnalogSample                  =   -1;
+	_VoutPreviousAnalogSample          =   -1.0;
+	_temperatureMeasurementsMarker     =   0;
+    _rTemperatureMeasurementsMarker    =   0;
+    _rLineMeasurementsMarker           =   0;
+    _measuredTemperatureDeviation      =   0.0;
+    _sampleDeviation                   =   0.0;
+
+    analogReference(INTERNAL1V1);									// EXTERNAL && INTERNAL2V56 && INTERNAL1V1
+    pinMode(_OutputPin_SensorPower, OUTPUT);            // setup temperature sensor input pin
+    digitalWrite(_OutputPin_SensorPower, LOW);      // initialize sensor on
+}
+
+void Temperature::safeHardwarePowerOff() {
+  digitalWrite(_OutputPin_SensorPower, LOW);        // Turn temperature sensor OFF for safety
+  digitalWrite(_OutputPin_ThirdLinePower, LOW);        // Turn temperature sensor OFF for safety
+}
+
+void Temperature::measure1(boolean ln, boolean rline) {
+  if(millis() - _lastTemperatureRead >= _TimeBetweenReadings) {                           //time to measure temperature
+    
+    /** measure Vout analog sample */
+    digitalWrite(_OutputPin_SensorPower, HIGH);      // initialize sensor on
+    digitalWrite(_OutputPin_ThirdLinePower, HIGH);      // initialize sensor on
+    delay(10);
+    _VoutAnalogSample = analogRead(_InputPin_TemperatureReading) + _sampleDeviation;     // Get a reading
+    _VoutRAnalogSample = analogRead(_InputPin_ThirdLineReading) + _sampleDeviation;     // Get a reading
+    digitalWrite(_OutputPin_SensorPower, LOW);      // initialize sensor on
+    digitalWrite(_OutputPin_ThirdLinePower, LOW);      // initialize sensor on
+
+    _lastTemperatureRead            = millis();                                             // Mark time of temperature reading
+
+    _rTemperatureMeasurementsMarker++;                                                                                                                                                   // Position reading buffer marker at the last updated position
+    if(_rTemperatureMeasurementsMarker >= TEMPERATURE_AVERAGE_VALUE_I) _rTemperatureMeasurementsMarker = 0;           // Check that it has not gone out of the buffer range
+    _rTemperatureMeasurements[_rTemperatureMeasurementsMarker] = _VoutAnalogSample;
+    float Vout = GetMedian(_rTemperatureMeasurements) * _ADCVmax / CONSTANT_ADC_STEP_COUNT;
+    float Rx = _R1 / ( _Vs / Vout - 1.0);
+
+    if(rline) {
+        _rLineMeasurementsMarker++;                                                                                                                                                   // Position reading buffer marker at the last updated position
+        if(_rLineMeasurementsMarker >= TEMPERATURE_AVERAGE_VALUE_I) _rLineMeasurementsMarker = 0;           // Check that it has not gone out of the buffer range
+        _rLineMeasurements[_rLineMeasurementsMarker] = _VoutRAnalogSample;
+
+        /** Calculate temperature value */
+        float VoutR = GetMedian(_rLineMeasurements) * _ADCVmax / CONSTANT_ADC_STEP_COUNT;
+        float Rline = _R2 / ( _Vs / VoutR - 1.0);
+        _measuredTemperature = 1.08271 * pow(10.0, -13.0) * (3.12508 * pow(10.0, 16.0) - 5.65566 * pow(10.0, 6.0) * sqrt(3.51501 * pow(10.0, 19.0) - 4.61805 * pow(10.0, 16.0) * (Rx - Rline)));
+    }
+    else {
+        /** Calculate temperature value */
+        _measuredTemperature = 1.08271 * pow(10.0, -13.0) * (3.12508 * pow(10.0, 16.0) - 5.65566 * pow(10.0, 6.0) * sqrt(3.51501 * pow(10.0, 19.0) - 4.61805 * pow(10.0, 16.0) * Rx));
+    }
+    
+
+    //xFilterNoise(_temperatureMeasurementsMarker);
+/*
+    Serial.print("Temperature : [");
+    Serial.print(_name);
+    Serial.print("]\tVoutSample: [");
+    Serial.print(_VoutAnalogSample);
+
+
+//    Serial.print("]\tVout[");
+//    Serial.print(Vout,6);
+//    Serial.print("]\tRx[");
+//    Serial.print(Rx,6);
+
+    
+    Serial.print("]\tTNow[");
+    Serial.print(measuredTemperatureNow,6);
+    Serial.print("]\tTCalc[");
+    Serial.print(_measuredTemperature,6);
+    Serial.println("] ");
+*/
+
+
+    //Serial.print("Temperature : [");
+    #ifdef DEBUG
+    Serial.print(_name);
+    Serial.print(",");
+    Serial.print(_VoutAnalogSample);
+    Serial.print(",");
+    //Serial.print(_VoutRAnalogSample);
+    //Serial.print(",");
+
+    /*Serial.print(test);
+    Serial.print(",");
+    Serial.print(Rtest);
+    Serial.print(",");*/
+    /*Serial.print(Vout,6);
+    Serial.print(",");
+    Serial.print(Rx,6);
+
+    
+    Serial.print(",");
+    Serial.print(measuredTemperatureNow,6);
+    Serial.print(",");
+    Serial.print(_measuredTemperature,6);
+    Serial.print(",");*/
+    if(ln) Serial.println("");
+    #endif
+  }
+}
+
+float Temperature::GetMedian(int array[]){
+    int sorted[TEMPERATURE_AVERAGE_VALUE_I];
+    float value = 0.0;
+
+    for(int x = 0; x < TEMPERATURE_AVERAGE_VALUE_I; x++) {
+        sorted[x] = array[x];
+    }
+
+     //ARRANGE VALUES
+    for(int x = 0; x < TEMPERATURE_AVERAGE_VALUE_I; x++){
+        for(int y = 0; y < TEMPERATURE_AVERAGE_VALUE_I - 1; y++){
+            if(sorted[y]>sorted[y+1]){
+                int temp = sorted[y+1];
+                sorted[y+1] = sorted[y];
+                sorted[y] = temp;
+            }
+        }
+    }
+
+    //CALCULATE THE MEDIAN (middle number)
+    if(TEMPERATURE_AVERAGE_VALUE_I % 2 != 0){// is the # of elements odd?
+        int temp = ((TEMPERATURE_AVERAGE_VALUE_I+1)/2)-1;
+        value = (float) sorted[temp];
+    }
+    else{// then it's even! :)
+        value = ((float) ( sorted[(TEMPERATURE_AVERAGE_VALUE_I/2)-1] + sorted[TEMPERATURE_AVERAGE_VALUE_I/2] )) / 2.0;
+    }
+
+    return value;
+}
+
+float Temperature::getCurrentTemperature() {
+    return _measuredTemperature + _measuredTemperatureDeviation;
+}
+
+float Temperature::getMeasuredTemperatureDeviation() {
+    return _measuredTemperatureDeviation;
+}
+float Temperature::setMeasuredTemperatureDeviation( float measuredTemperatureDeviation) {
+    if( _measuredTemperatureDeviation != measuredTemperatureDeviation ) {
+        _measuredTemperatureDeviation = measuredTemperatureDeviation;
+
+        for( int i = 0; i < TEMPERATURE_AVERAGE_VALUE_I; i++ ) {
+            _temperatureMeasurements[i] = _temperatureMeasurements[i] + ( _measuredTemperatureDeviation * -1 );
+        }
+    }
+    
+    return _measuredTemperatureDeviation;
+}
+
+float Temperature::setSampleDeviation( float sampleDeviation) {
+    _sampleDeviation = sampleDeviation;
+
+    return _sampleDeviation;
+}
