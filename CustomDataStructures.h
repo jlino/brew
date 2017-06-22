@@ -6,6 +6,8 @@
 #ifndef CustomDataStructures_h
 #define CustomDataStructures_h
 
+#define SYS_MAX_MENU_ELEMENTS   16
+
 enum eRotaryEncoderMode {
 	eRotaryEncoderMode_Menu,
 	eRotaryEncoderMode_Time,
@@ -111,10 +113,10 @@ enum eBeerProfile {
 };
 
 typedef struct menuData_ {
-  char *_title;
+  const char *_title;
+  const char *_dialog[ SYS_MAX_MENU_ELEMENTS ];
   int  _position;
   int  _selection;
-  char **_dialog;
   bool _repaint;
 } MenuData;
 

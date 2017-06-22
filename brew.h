@@ -1,6 +1,31 @@
 #ifndef __BREW
 #define __BREW
 
+
+// ++++++++++++++++++++++++ LiquidCrystal_I2C ++++++++++++++++++++++++
+#include <Wire.h>
+#include <LCD.h>
+#include <LiquidCrystal_I2C.h>
+
+// ++++++++++++++++++++++++ PT100 +++++++++++++++++++++++++++++++++
+//#include <PT100.h>
+
+// ++++++++++++++++++++++++ Defines +++++++++++++++++++++++++++++++++
+#define NELEMS(x)               (sizeof(x) / sizeof((x)[0]))
+
+// ++++++++++++++++++++++++ OTHER +++++++++++++++++++++++++++++++++
+#include "CustomDataStructures.h"
+#include "debug.h"
+
+#include "config.h"
+
+#include "Melody.h"
+#include "Display.h"
+#include "Temperature.h"
+#include "Profiles.h"
+
+// ++++++++++++++++++++++++ FUNCTIONS +++++++++++++++++++++++++++++++++
+
 void xSetupRotaryEncoder( eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep );
 
 // ######################### START #########################
