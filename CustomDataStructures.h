@@ -118,6 +118,7 @@ typedef struct menuData_ {
   int  _position;
   int  _selection;
   bool _repaint;
+  void (*_selectionFunction)(void);
 } MenuData;
 
 #endif

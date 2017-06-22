@@ -95,36 +95,45 @@
 #define MENU_MAIN_INIT_POSITION                   eMainMenu_GO
 #define MENU_MAIN_INIT_SELECTION                  eMainMenu_NULL
 #define MENU_MAIN_INIT_REPAINT                    false
+#define MENU_MAIN_FUNCTION                        &runMainMenuSelection
 
 #define MENU_PROFILE_TITLE                        "Profile Menu"
 #define MENU_PROFILE_DIALOG                       {"", "-> Basic        ", "-> Trigo        ", "-> IPA          ", "-> Belga        ", "-> Red          ", "-> APA          ", "-> Custom       ", "-> Back         " }
 #define MENU_PROFILE_INIT_POSITION                eBeerProfileMenu_Basic
 #define MENU_PROFILE_INIT_SELECTION               eBeerProfileMenu_NULL
 #define MENU_PROFILE_INIT_REPAINT                 false
+#define MENU_PROFILE_FUNCTION                     &runBeerProfileSelection
 
 #define MENU_STAGE_TITLE                          "Stage Menu"
 #define MENU_STAGE_DIALOG                         {"", "-> Startpoint   ", "-> BetaGlucanase", "-> Debranching  ", "-> Proteolytic  ", "-> Beta Amylase ", "-> Alpha Amylase", "-> Mashout      ", "-> Recirculation", "-> Sparge       ", "-> Boil         ", "-> Cooling      ", "-> Back         " }
 #define MENU_STAGE_INIT_POSITION                  eStageMenu_Startpoint
 #define MENU_STAGE_INIT_SELECTION                 eStageMenu_NULL
 #define MENU_STAGE_INIT_REPAINT                   false
+#define MENU_STAGE_FUNCTION                       &runStageSelection
 
 #define MENU_MALT_TITLE                           "Malt Menu"
 #define MENU_MALT_DIALOG                          {"", "-> CM Ch. Pilsen", "-> CM Wheat Blan", "-> Back         " }
 #define MENU_MALT_INIT_POSITION                   eMaltMenu_CastleMalting_Chteau_Pilsen_2RS
 #define MENU_MALT_INIT_SELECTION                  eMaltMenu_NULL
 #define MENU_MALT_INIT_REPAINT                    false
+#define MENU_MALT_FUNCTION                        &runMaltSelection
 
 #define MENU_SETTINGS_TITLE                       "Settings Menu"
 #define MENU_SETTINGS_DIALOG                      {"", "-> PT100 Element", "-> PT100 Up     ", "-> PT100 Down   ", "-> Back         " }
 #define MENU_SETTINGS_INIT_POSITION               eSettingsMenu_PT100_Element
 #define MENU_SETTINGS_INIT_SELECTION              eSettingsMenu_NULL
 #define MENU_SETTINGS_INIT_REPAINT                false
+#define MENU_SETTINGS_FUNCTION                    &runSettingsSelection
+
+#define MENU_GLOBAL_STR_TEMPERATURE               "temperature"
+#define MENU_GLOBAL_STR_CELSIUS                   "*C"
 
 #define MENU_START_TITLE                          MENU_STAGE_TITLE
 #define MENU_START_DIALOG                         MENU_STAGE_DIALOG
 #define MENU_START_INIT_POSITION                  MENU_STAGE_INIT_POSITION
 #define MENU_START_INIT_SELECTION                 MENU_STAGE_INIT_SELECTION
 #define MENU_START_INIT_REPAINT                   MENU_STAGE_INIT_REPAINT
+#define MENU_START_FUNCTION                       &runStartFromStageSelection
 
 // ++++++++++++++++++++++++ Serial Monotor ++++++++++++++++++++++++
 #define SETTING_SERIAL_MONITOR_BAUD_RATE          9600

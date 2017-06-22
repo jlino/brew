@@ -17,6 +17,14 @@
 #include "CustomDataStructures.h"
 #include "debug.h"
 
+// ++++++++++++++++++++++++ FUNCTIONS (used in configuration) +++++++++++++++++++++++++++++++++
+void runMainMenuSelection();
+void runStartFromStageSelection();
+void runBeerProfileSelection();
+void runStageSelection();
+void runMaltSelection();
+void runSettingsSelection();
+
 #include "config.h"
 
 #include "Melody.h"
@@ -38,23 +46,15 @@ void xWelcomeUser();
 
 void runMenu();
 
-void runSettingsSelection();
+void runMenuProcessor( MenuData *data );
 
-void runMaltSelection();
-
-void runStageSelection();
-
-void runBeerProfileSelection();
+void runStageSelection_Generic( unsigned long * selectedStageTime, int *selectedStageTemperature);
 
 void xStartStage( unsigned long *stageTime, int *stageTemperature, eCookingStages nextStage, bool bPurgePump, bool bSetFinalYield, bool bSetTime, bool bSetTemperature );
 
 void xStartStageHeadless( eCookingStages nextStage, bool bPurgePump );
 
 void xStartStageInteractive( unsigned long *stageTime, int *stageTemperature, eCookingStages nextStage );
-
-void runStartFromStageSelection();
-
-void runMainMenuSelection();
 
 void xCountTheTime( int temperatureRange, boolean bAverageUpDown );
 
