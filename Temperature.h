@@ -8,7 +8,7 @@
 
 #include "Arduino.h"
 
-#define DEBUG
+//#define DEBUG
 
 #define CONSTANT_ADC_STEP_COUNT 	1024.0
 

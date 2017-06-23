@@ -34,8 +34,8 @@ Temperature::Temperature(const char *name,
     _measuredTemperatureDeviation      =   0.0;
     _pump                              =   false;
 
-    analogReference(INTERNAL1V1);                                   // EXTERNAL && INTERNAL2V56 && INTERNAL1V1
-    pinMode(_OutputPin_SensorPower, OUTPUT);            // setup temperature sensor input pin
+    analogReference(INTERNAL1V1);                   // EXTERNAL && INTERNAL2V56 && INTERNAL1V1
+    pinMode(_OutputPin_SensorPower, OUTPUT);        // setup temperature sensor input pin
     digitalWrite(_OutputPin_SensorPower, LOW);      // initialize sensor on
 }
 
@@ -177,7 +177,7 @@ float Temperature::GetMode(float new_array[]) {
 }
 
 float Temperature::getCurrentTemperature() {
-    return _measuredTemperature; // - 4.41;
+    return _measuredTemperature>0.0?_measuredTemperature:0.0; // - 4.41;
 }
 
 float Temperature::setPumpStatus( bool pump ) {
