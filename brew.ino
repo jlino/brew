@@ -1684,7 +1684,7 @@ boolean checkForEncoderSwitchPush( bool cancelable ) {
     while (digitalRead(ROTARY_ENCODER_SW_PIN)) {        // Wait until switch is released
       delay(ROTARY_ENCODER_SW_DEBOUNCE_TIME);           // debounce
       
-      if( ((millis() - cancleTimer) >= (SETTING_CANCEL_TIMER/2) ) && cancelable ) {
+      if( ((millis() - cancleTimer) >= SETTING_CANCEL_TIMER ) && cancelable ) {
         sing(BUZZ_1, PIEZO_PIN);
       }
     }
