@@ -37,8 +37,6 @@ boolean                 clockEnd;
 
 unsigned long           cookTime;
 int                     cookTemperature;
-//cook_mode_list        cookMode;
-//int                   cookMixerSpeed;
 int                     finalYield;
 
 unsigned long           startpointTime;
@@ -69,6 +67,7 @@ int                     cleaningTemperature;
 
 boolean                 refresh;
 boolean                 repaint;
+boolean                 cancel;
 
 boolean                 bStatusElement;
 
@@ -286,10 +285,12 @@ void setup() {
   rotarySwDetectTime = 0;
 
   // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
-  eMenuType                   =   eMenuType_Main;
+  eMenuType                   =   MENU_INIT;
 
-  cookingStage                =   eCookingStage_Startpoint;
-  beerProfile                 =   eBeerProfile_Basic;
+  cookingStage                =   SETTING_COOKING_STAGE_INIT;
+  beerProfile                 =   SETTING_BEER_PROFILE_INIT;
+
+  cancel                      =   false;
   // ++++++++++++++++++++++++ Global Variables ++++++++++++++++++++++++
 
   cooking                     =   false;
@@ -303,9 +304,7 @@ void setup() {
 
   cookTime                    =   3600;
   cookTemperature             =   25;
-  //cookMode                  =   quick_start;
-  //cookMixerSpeed            =   120;
-  finalYield                  =   25;
+  finalYield                  =   SETTING_MACHINE_YIELD_DEFAULT;
 
   startpointTime              =   PROFILE_BASIC_STARTPOINT_TIME;
   betaGlucanaseTime           =   PROFILE_BASIC_BETAGLUCANASE_TIME;
@@ -1375,8 +1374,12 @@ void runStageSelection() {
 void runSettingsSelection() {
   switch (mdSettingsMenu._selection) {
     case eSettingsMenu_Pump: {
-        // Stuff
-        if ( xSetGenericValue( iPumpSpeed ? 0 : 1, 0, 1, "pump", "bool" ) ) {
+        bool bNewPumpStatus = xSetGenericValue( iPumpSpeed ? 0 : 1, PUMP_SPEED_DEFAULT, 0, 1, "pump", "bool" );
+        if( cancel ) {
+          cancel = false;
+          return;
+        }
+        if ( bNewPumpStatus ) {
           iPumpSpeed = PUMP_SPEED_MAX_MOSFET;
         } else {
           iPumpSpeed = PUMP_SPEED_STOP_MOSFET;
@@ -1432,16 +1435,30 @@ void runMenuProcessor( MenuData *data ) {
   data->_repaint = repaint;                               // Request repaint
   repaint = displayGenericMenu( &lcd, data );             // Display menu
 
-  if ( gotButtonPress( ROTARY_ENCODER_SW_PIN ) ) {        // Read selection
+  if ( checkForEncoderSwitchPush( false ) ) {             // Read selection
     data->_selection = data->_position;
   }
   
-  (data->_selectionFunction)();                            // Run selection function
+  (data->_selectionFunction)();                           // Run selection function
 }
 
 void runStageSelection_Generic( unsigned long * selectedStageTime, int *selectedStageTemperature) {
-  (*selectedStageTime) = getTimer( (*selectedStageTime) );
-  (*selectedStageTemperature) = xSetGenericValue( (*selectedStageTemperature), TEMPERATURE_MIN_VALUE, TEMPERATURE_MAX_VALUE, MENU_GLOBAL_STR_TEMPERATURE, MENU_GLOBAL_STR_CELSIUS );
+  unsigned long selectedStageTimeStorage = *selectedStageTime;
+  int selectedStageTemperatureStorage = *selectedStageTemperature;
+  
+  *selectedStageTime = getTimer( *selectedStageTime );
+  if( cancel ) {
+    *selectedStageTime = selectedStageTimeStorage;
+    cancel = false;
+    return;
+  }
+  *selectedStageTemperature = getTemperature( *selectedStageTemperature );
+  if( cancel ) {
+    *selectedStageTime = selectedStageTimeStorage;
+    *selectedStageTemperature = selectedStageTemperatureStorage;
+    cancel = false;
+    return;
+  }
   backToStatus();
 }
 
@@ -1454,17 +1471,38 @@ void xStartStageInteractive( unsigned long *stageTime, int *stageTemperature, eC
 }
 
 void xStartStage( unsigned long *stageTime, int *stageTemperature, eCookingStages nextStage, bool bPurgePump, bool bSetFinalYield, bool bSetTime, bool bSetTemperature ) {
-  xSafeHardwarePowerOff();                      // Stop anything that might be still going on
-
+  int finalYieldStorage = finalYield;
+  unsigned long stageTimeStorage = *stageTime;
+  int stageTemperatureStorage = *stageTemperature;
+  
   if (bSetFinalYield) {
-    finalYield = xSetFinalYield( finalYield );
+    finalYield = getFinalYield( finalYield, SETTING_MACHINE_YIELD_DEFAULT );
+    if( cancel ) {
+      finalYield = finalYieldStorage;
+      cancel = false;
+      return;
+    }
   }
   if (bSetTime) {
-    (*stageTime) = getTimer( clockCounter / 1000, (*stageTime) );
+    (*stageTime) = getTimer( clockCounter / 1000, *stageTime );
+    if( cancel ) {
+      finalYield = finalYieldStorage;
+      *stageTime = stageTimeStorage;
+      cancel = false;
+      return;
+    }
   }
   if (bSetTemperature) {
-    (*stageTemperature) = xSetTemperature( (*stageTemperature) );
+    (*stageTemperature) = getTemperature( cookTemperature, *stageTemperature );
+    if( cancel ) {
+      finalYield = finalYieldStorage;
+      *stageTime = stageTimeStorage;
+      *stageTemperature = stageTemperatureStorage;
+      cancel = false;
+      return;
+    }
   }
+  xSafeHardwarePowerOff();                      // Stop anything that might be still going on
   if (bPurgePump) {
     xPurgePump();
   }
@@ -1494,8 +1532,7 @@ void resetMenu( boolean requestRepaintPaint ) {
     repaint = true;
   }
 
-  // reset operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-  xSetupRotaryEncoder( eRotaryEncoderMode_Menu, mdMainMenu._position, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+  xSetupRotaryEncoder( eRotaryEncoderMode_Menu, mdMainMenu._position, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );       // reset operation state
 }
 
 void backToStatus() {
@@ -1505,6 +1542,68 @@ void backToStatus() {
 // #################################################### Helpers ##################################################################
 
 // #################################################### Set Variables ##################################################################
+
+int getTemperature(int initialValue ) { return getTemperature( initialValue, initialValue ); }
+int getTemperature(int initialValue, int defaultValue ) { return xSetGenericValue( initialValue, defaultValue, TEMPERATURE_MIN_VALUE, TEMPERATURE_MAX_VALUE, MENU_GLOBAL_STR_TEMPERATURE, MENU_GLOBAL_STR_CELSIUS ); }
+
+int getFinalYield( int initialValue ) { return getFinalYield( initialValue, SETTING_MACHINE_YIELD_DEFAULT ); }
+int getFinalYield( int initialValue, int defaultValue ) { return xSetGenericValue( initialValue, defaultValue, SETTING_MACHINE_YIELD_CAPACITY_MIN, SETTING_MACHINE_YIELD_CAPACITY_MAX, "Final Yield", "l" ); }
+
+int xSetGenericValue(int initialValue, int defaultValue, int minimumValue, int maximumValue, const char *valueName, const char *unit) {
+  xSetupRotaryEncoder( eRotaryEncoderMode_Generic, initialValue, maximumValue, minimumValue, 1, 5 );
+
+  // initialize variables
+  int rotaryEncoderPreviousPosition = 0;
+
+  // Setup Screen
+  lcd.clear();
+  lcd.home();
+  lcd.print( "Set " );
+  lcd.print( valueName );
+  lcd.print( "(" );
+  lcd.print( defaultValue );
+  lcd.print( ")" );
+  lcd.setCursor ( 0 , LCD_VERTICAL_RESOLUTION - 1 );
+  lcd.print( "       0 " );
+  lcd.print( unit );
+
+  while (true) {
+    if( checkForEncoderSwitchPush( true ) ) {                   // Check if pushbutton is pressed
+      if( cancel ) return rotaryEncoderVirtualPosition;
+      break;
+    }
+    else {
+      xManageMachineSystems();                            // Don't forget to keep an eye on the cooking
+    }
+
+    // Check if there was an update by the rotary encoder
+    if ( rotaryEncoderVirtualPosition != rotaryEncoderPreviousPosition ) {
+      rotaryEncoderPreviousPosition = rotaryEncoderVirtualPosition;
+
+      lcd.setCursor( 0, LCD_VERTICAL_RESOLUTION - 1 );
+      lcd.print( "     " );
+      if ( rotaryEncoderVirtualPosition < 10 ) {
+        lcd.print( "  " );
+      }
+      else {
+        if ( rotaryEncoderVirtualPosition < 100 ) {
+          lcd.print( " " );
+        }
+      }
+      lcd.print( rotaryEncoderVirtualPosition );
+      lcd.print( " " );
+      lcd.print( unit );
+      lcd.println( "                " );
+    }
+  }
+
+  return rotaryEncoderVirtualPosition;
+}
+
+int getTimer( int initialValue ) {
+  return getTimer( initialValue, initialValue );
+}
+
 int getTimer( int initialValue, int defaultValue ) {
   // set operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
   xSetupRotaryEncoder( eRotaryEncoderMode_Time, initialValue, 7200, 0, 1, 30 );
@@ -1531,19 +1630,12 @@ int getTimer( int initialValue, int defaultValue ) {
   lcd.print("      0:00");
 
   while (true) {
-    // Check if pushbutton is pressed
-    if ((digitalRead(ROTARY_ENCODER_SW_PIN))) {
-      // Wait until switch is released
-      while (digitalRead(ROTARY_ENCODER_SW_PIN)) {}
-
-      // debounce
-      delay(10);
-
-      // Job is done, break the circle
+    if( checkForEncoderSwitchPush( true ) ) {
+      if( cancel ) return rotaryEncoderVirtualPosition;
       break;
-    } else {
-      // Don't forget to keep an eye on the cooking
-      xManageMachineSystems();
+    }
+    else {
+      xManageMachineSystems();                            // Don't forget to keep an eye on the cooking
     }
 
     // display current timer
@@ -1574,129 +1666,24 @@ int getTimer( int initialValue, int defaultValue ) {
   return rotaryEncoderVirtualPosition;
 }
 
-int getTimer( int initialValue ) {
-  return getTimer( initialValue, initialValue );
-}
-
-int getTemperature(int initialValue) {
-
-  // set operation state
-  rotaryEncoderMode = eRotaryEncoderMode_Generic;
-  rotaryEncoderVirtualPosition = initialValue;
-
-  // initialize variables
-  int rotaryEncoderPreviousPosition = 0;
-
-  // Setup Screen
-  lcd.clear();
-  lcd.home();
-  lcd.print("Set Temperature");
-  lcd.setCursor (0, LCD_VERTICAL_RESOLUTION - 1);
-  lcd.print("       0 *C");
-
-  rotaryEncoderMaxPosition = TEMPERATURE_SETTING_MAX_VALUE;
-
-  while (true) {
-    // Check if pushbutton is pressed
-    if ((digitalRead(ROTARY_ENCODER_SW_PIN))) {
-      // Wait until switch is released
-      while (digitalRead(ROTARY_ENCODER_SW_PIN)) {}
-
-      // debounce
-      delay(10);
-
-      // Job is done, break the circle
-      break;
-    } else {
-      // Don't forget to keep an eye on the cooking
-      xManageMachineSystems();
+boolean checkForEncoderSwitchPush( bool cancelable ) {
+  boolean gotPush = digitalRead(ROTARY_ENCODER_SW_PIN);
+  if (gotPush) {           // Check if pushbutton is pressed
+    unsigned long cancleTimer = millis();
+    while (digitalRead(ROTARY_ENCODER_SW_PIN)) {        // Wait until switch is released
+      delay(ROTARY_ENCODER_SW_DEBOUNCE_TIME);           // debounce
+      
+      if( ((millis() - cancleTimer) >= (SETTING_CANCEL_TIMER/2) ) && cancelable ) {
+        sing(BUZZ_1, PIEZO_PIN);
+      }
     }
 
-    // display current timer
-    if (rotaryEncoderVirtualPosition != rotaryEncoderPreviousPosition) {
-      rotaryEncoderPreviousPosition = rotaryEncoderVirtualPosition;
-
-      lcd.setCursor (0, LCD_VERTICAL_RESOLUTION - 1);
-      lcd.print("     ");
-      if (rotaryEncoderVirtualPosition < 10) {
-        lcd.print("  ");
-      }
-      else {
-        if (rotaryEncoderVirtualPosition < 100) {
-          lcd.print(" ");
-        }
-      }
-      lcd.print(rotaryEncoderVirtualPosition);
-      lcd.print(" *C");
-      lcd.println("                ");
+    if( ((millis() - cancleTimer) >= SETTING_CANCEL_TIMER) && cancelable ) {
+      cancel = true;
     }
   }
 
-  return rotaryEncoderVirtualPosition;
-}
-
-int xSetGenericValue(int initialValue, int minimumValue, int maximumValue, const char *valueName, const char *unit) {
-  // set operation state | INPUT : eRotaryEncoderMode newMode, int newPosition, int newMaxPosition, int newMinPosition, int newSingleStep, int newMultiStep
-  xSetupRotaryEncoder( eRotaryEncoderMode_Generic, initialValue, maximumValue, minimumValue, 1, 5 );
-
-  // initialize variables
-  int rotaryEncoderPreviousPosition = 0;
-
-  // Setup Screen
-  lcd.clear();
-  lcd.home();
-  lcd.print( "Set " );
-  lcd.print( valueName );
-  lcd.setCursor ( 0 , LCD_VERTICAL_RESOLUTION - 1 );
-  lcd.print( "       0 " );
-  lcd.print( unit );
-
-  while (true) {
-    // Check if pushbutton is pressed
-    if ( digitalRead(ROTARY_ENCODER_SW_PIN) ) {
-      // Wait until switch is released
-      while ( digitalRead(ROTARY_ENCODER_SW_PIN) ) {}
-
-      // debounce
-      delay( 10 );
-
-      // Job is done, break the circle
-      break;
-    } else {
-      // Don't forget to keep an eye on the cooking
-      xManageMachineSystems();
-    }
-
-    // Check if there was an update by the rotary encoder
-    if ( rotaryEncoderVirtualPosition != rotaryEncoderPreviousPosition ) {
-      rotaryEncoderPreviousPosition = rotaryEncoderVirtualPosition;
-
-      lcd.setCursor( 0, LCD_VERTICAL_RESOLUTION - 1 );
-      lcd.print( "     " );
-      if ( rotaryEncoderVirtualPosition < 10 ) {
-        lcd.print( "  " );
-      }
-      else {
-        if ( rotaryEncoderVirtualPosition < 100 ) {
-          lcd.print( " " );
-        }
-      }
-      lcd.print( rotaryEncoderVirtualPosition );
-      lcd.print( " " );
-      lcd.print( unit );
-      lcd.println( "                " );
-    }
-  }
-
-  return rotaryEncoderVirtualPosition;
-}
-
-int xSetTemperature( int initialValue ) {
-  return xSetGenericValue( initialValue, TEMPERATURE_MIN_VALUE, TEMPERATURE_MAX_VALUE, "temperature", "*C" );
-}
-
-int xSetFinalYield( int initialValue ) {
-  return xSetGenericValue( initialValue, SETTING_MACHINE_YIELD_CAPACITY_MIN, SETTING_MACHINE_YIELD_CAPACITY_MAX, "Final Yield", "l" );
+  return gotPush;
 }
 
 unsigned long getInactivityTime() {
@@ -1704,11 +1691,7 @@ unsigned long getInactivityTime() {
   unsigned long rotaryEncoderInactivityTime = now - lastInterruptTime;
 
   if (rotaryEncoderInactivityTime > SETTING_MAX_INACTIVITY_TIME) {
-    if (digitalRead(ROTARY_ENCODER_SW_PIN)) {
-      while (digitalRead(ROTARY_ENCODER_SW_PIN)) {
-        delay(ROTARY_ENCODER_SW_DEBOUNCE_TIME);
-      }
-
+    if (checkForEncoderSwitchPush( false )) {
       now = millis();
       rotaryEncoderInactivityTime = now - lastInterruptTime;
       rotarySwDetectTime = now;
@@ -1726,17 +1709,10 @@ unsigned long getInactivityTime() {
 
 void xWaitForAction(String title, String message) {
   while (true) {
-    // Check if pushbutton is pressed
-    if ( digitalRead(ROTARY_ENCODER_SW_PIN) ) {
-      // Wait until switch is released
-      while ( digitalRead(ROTARY_ENCODER_SW_PIN) ) {}
-
-      // debounce
-      delay( 10 );
-
-      // Job is done, break the circle
+    if( checkForEncoderSwitchPush( false ) ) {                   // Check if pushbutton is pressed
       break;
-    } else {
+    }
+    else {
       sing(BUZZ_1, PIEZO_PIN);
 
       // Print the message
@@ -1745,16 +1721,4 @@ void xWaitForAction(String title, String message) {
       }
     }
   }
-}
-
-boolean gotButtonPress(int iPin) {
-  boolean ret = false;
-
-  if ((digitalRead(iPin))) {    // check if pushbutton is pressed
-    ret = true;
-    while (digitalRead(iPin)) {}    // wait til switch is released
-    delay(10);                            // debounce
-  }
-
-  return ret;
 }

@@ -94,24 +94,23 @@ void backToStatus();
 
 // #################################################### Set Variables ##################################################################
 
-int getTimer( int initialValue, int defaultValue );
+boolean checkForEncoderSwitchPush( bool cancelable );
 
 int getTimer( int initialValue );
+int getTimer( int initialValue, int defaultValue );
 
-int getTemperature(int initialValue);
+int getTemperature( int initialValue );
+int getTemperature( int initialValue, int defaultValue );
 
-int xSetGenericValue(int initialValue, int minimumValue, int maximumValue, const char *valueName, const char *unit);
+int getFinalYield( int initialValue );
+int getFinalYield( int initialValue, int defaultValue );
 
-int xSetTemperature( int initialValue );
-
-int xSetFinalYield( int initialValue );
+int xSetGenericValue( int initialValue, int defaultValue, int minimumValue, int maximumValue, const char *valueName, const char *unit );
 
 unsigned long getInactivityTime();
 
 // ###################### Set Variables ##################################################
 
 void xWaitForAction(String title, String message);
-
-boolean gotButtonPress(int iPin);
 
 #endif //__BREW
