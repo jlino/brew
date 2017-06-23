@@ -1377,14 +1377,15 @@ void runSettingsSelection() {
         bool bNewPumpStatus = xSetGenericValue( iPumpSpeed ? 0 : 1, PUMP_SPEED_DEFAULT, 0, 1, "pump", "bool" );
         if( cancel ) {
           cancel = false;
-          return;
         }
-        if ( bNewPumpStatus ) {
-          iPumpSpeed = PUMP_SPEED_MAX_MOSFET;
-        } else {
-          iPumpSpeed = PUMP_SPEED_STOP_MOSFET;
+        else {
+          if ( bNewPumpStatus ) {
+            iPumpSpeed = PUMP_SPEED_MAX_MOSFET;
+          } else {
+            iPumpSpeed = PUMP_SPEED_STOP_MOSFET;
+          }
+          analogWrite(PUMP_PIN, iPumpSpeed);
         }
-        analogWrite(PUMP_PIN, iPumpSpeed);
         backToStatus();
         break;
       }
@@ -1450,14 +1451,14 @@ void runStageSelection_Generic( unsigned long * selectedStageTime, int *selected
   if( cancel ) {
     *selectedStageTime = selectedStageTimeStorage;
     cancel = false;
-    return;
   }
-  *selectedStageTemperature = getTemperature( *selectedStageTemperature );
-  if( cancel ) {
-    *selectedStageTime = selectedStageTimeStorage;
-    *selectedStageTemperature = selectedStageTemperatureStorage;
-    cancel = false;
-    return;
+  else {
+    *selectedStageTemperature = getTemperature( *selectedStageTemperature );
+    if( cancel ) {
+      *selectedStageTime = selectedStageTimeStorage;
+      *selectedStageTemperature = selectedStageTemperatureStorage;
+      cancel = false;
+    }
   }
   backToStatus();
 }
@@ -1479,7 +1480,9 @@ void xStartStage( unsigned long *stageTime, int *stageTemperature, eCookingStage
     finalYield = getFinalYield( finalYield, SETTING_MACHINE_YIELD_DEFAULT );
     if( cancel ) {
       finalYield = finalYieldStorage;
+      
       cancel = false;
+      backToStatus();
       return;
     }
   }
@@ -1488,7 +1491,9 @@ void xStartStage( unsigned long *stageTime, int *stageTemperature, eCookingStage
     if( cancel ) {
       finalYield = finalYieldStorage;
       *stageTime = stageTimeStorage;
+      
       cancel = false;
+      backToStatus();
       return;
     }
   }
@@ -1498,15 +1503,17 @@ void xStartStage( unsigned long *stageTime, int *stageTemperature, eCookingStage
       finalYield = finalYieldStorage;
       *stageTime = stageTimeStorage;
       *stageTemperature = stageTemperatureStorage;
+      
       cancel = false;
+      backToStatus();
       return;
     }
   }
+  
   xSafeHardwarePowerOff();                      // Stop anything that might be still going on
   if (bPurgePump) {
     xPurgePump();
   }
-
   startBrewing();
   xSetupStage( nextStage );
   backToStatus();
