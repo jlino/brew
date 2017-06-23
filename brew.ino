@@ -1436,7 +1436,11 @@ void runMenuProcessor( MenuData *data ) {
   data->_repaint = repaint;                               // Request repaint
   repaint = displayGenericMenu( &lcd, data );             // Display menu
 
-  if ( checkForEncoderSwitchPush( false ) ) {             // Read selection
+  if ( checkForEncoderSwitchPush( true ) ) {              // Read selection
+    if( cancel ) {
+      resetMenu( true );
+      return;
+    }
     data->_selection = data->_position;
   }
   
