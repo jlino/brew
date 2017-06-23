@@ -4,7 +4,8 @@
   Released into the public domain.
 */
 
-#define DEBUG
+//#define DEBUG
+#define INFO
 
 // ######################### LIBRARIES #########################
 #include "brew.h"
@@ -70,6 +71,9 @@ boolean                 repaint;
 boolean                 cancel;
 
 boolean                 bStatusElement;
+
+unsigned long           loggingTimeInterval;
+
 
 // ++++++++++++++++++++++++ Interrupts ++++++++++++++++++++++++
 static unsigned long    lastInterruptTime;
@@ -335,6 +339,8 @@ void setup() {
   refresh                     =   true;
   repaint                     =   true;
 
+  loggingTimeInterval         =   0;
+
   // ++++++++++++++++++++++++ Interrupts ++++++++++++++++++++++++
   lastInterruptTime           =   0;
 
@@ -368,9 +374,6 @@ void loop() {
 }
 
 // ######################### FUNCTIONS ########################
-
-
-
 
 void xCountTheTime( int temperatureMarginRange, boolean bMaximumOfUpDown ) {
   unsigned long now = millis();
@@ -465,47 +468,40 @@ bool xRegulateTemperature( boolean bMaximumOfUpDown ) {
 
   // Calculate applied wattage, based on the distance from the target temperature
   if ( overTemperature ) {
-    // turn it off
-    wattage = 0.0;
-  } else {
-    //if(difference <= 0.1) {
-    // turn it off
-    //  wattage = 0.0;
-    //} else {
-    if (difference <= 0.5) {
-      // pulse lightly at 500 watt
-      if (cookTemperature > 99.0) {
-        wattage = 2000.0;
+    wattage = 0.0;                      // turn it off
+  }
+  else {
+    if ( difference <= 0.5 ) {
+      if ( cookTemperature > 99.0 ) {
+        wattage = 2000.0;               // pulse hardly at 2000 watt
       }
       else {
-        if (cookTemperature > 70.0) {
-          wattage = 1000.0;
+        if ( cookTemperature > 70.0 ) {
+          wattage = 1000.0;             // pulse moderately at 1000 watt
         }
         else {
-          wattage = 500.0;
-        }
-      }
-    } else {
-      if (difference <= 1.0) {
-        // pulse moderately at 1000 watt
-        if (cookTemperature > 99.0) {
-          wattage = 2000.0;
-        }
-        else {
-          wattage = 1000.0;
-        }
-
-      } else {
-        if (difference <= 3.0) {
-          // pulse hardly at 2000 watt
-          wattage = 2000.0;
-        } else {
-          //pulse constantly at HEATING_ELEMENT_MAX_WATTAGE watt
-          wattage = HEATING_ELEMENT_MAX_WATTAGE;
+          wattage = 500.0;              // pulse lightly at 500 watt
         }
       }
     }
-    //}
+    else {
+      if ( difference <= 1.0 ) {
+        if ( cookTemperature > 99.0 ) {
+          wattage = 2000.0;             // pulse hardly at 2000 watt
+        }
+        else {
+          wattage = 1000.0;             // pulse moderately at 1000 watt
+        }
+      }
+      else {
+        if ( difference <= 3.0 ) {
+          wattage = 2000.0;             // pulse hardly at 2000 watt
+        }
+        else {
+          wattage = HEATING_ELEMENT_MAX_WATTAGE;  // pulse constantly at HEATING_ELEMENT_MAX_WATTAGE watt
+        }
+      }
+    }
   }
 
   // Update the recorded time for the begining of the window, if the previous window has passed
@@ -836,28 +832,6 @@ void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemp
 }
 
 void xManageMachineSystems() {
-
-#ifdef DEBUG
-  Serial.print(millis());
-  Serial.print(",");
-  if (cooking) {
-    Serial.print("1");
-  }
-  else {
-    Serial.print("0");
-  }
-  Serial.print(",");
-  Serial.print(cookTemperature);
-  Serial.print(",");
-  if (bStatusElement) {
-    Serial.print("1");
-  }
-  else {
-    Serial.print("0");
-  }
-  Serial.print(",");
-#endif
-
   // Measure temperature, for effect
   basePT100.measure(false);
   upPT100.measure(false);
@@ -921,17 +895,52 @@ void xManageMachineSystems() {
         break;
       }
     case eCookingStage_Purge: {
-      iPumpSpeed = PUMP_SPEED_MAX_MOSFET;
-      xRegulatePumpSpeed();
-      break;
-    }
+        iPumpSpeed = PUMP_SPEED_MAX_MOSFET;
+        xRegulatePumpSpeed();
+        break;
+      }
     case eCookingStage_Done: {
-      stopBrewing();                  // Update cooking state
-      repaint = true;                 // Ask for screen refresh
-      xWarnCookEnded();               // Warn the user that the cooking is done
-      break;
-    }
+        stopBrewing();                  // Update cooking state
+        repaint = true;                 // Ask for screen refresh
+        xWarnCookEnded();               // Warn the user that the cooking is done
+        break;
+      }
   }
+
+#ifdef INFO
+  unsigned long now = millis();
+  if( now - loggingTimeInterval > SETTING_MACHINE_LOGGING_INTERVAL ) {
+    loggingTimeInterval = now;
+    Serial.print(now);
+    Serial.print("|");
+    Serial.print(clockCounter);
+    Serial.print("|");
+    if (cooking) {
+      Serial.print("1");
+    }
+    else {
+      Serial.print("0");
+    }
+    Serial.print("|");
+    Serial.print(cookTemperature);
+    Serial.print("|");
+    Serial.print(basePT100.getCurrentTemperature());
+    Serial.print("|");
+    Serial.print(upPT100.getCurrentTemperature());
+    Serial.print("|");
+    Serial.print(downPT100.getCurrentTemperature());
+    Serial.print("|");
+    if (bStatusElement) {
+      Serial.print("1");
+    }
+    else {
+      Serial.print("0");
+    }
+    Serial.print("|");
+  }
+
+  
+#endif
 }
 
 // ##################################################### Menus ###################################################################
@@ -950,29 +959,29 @@ void runMenu() {
 
   switch (eMenuType) {
     case eMenuType_Main: {
-      runMenuProcessor( &mdMainMenu );
-      break;
-    }
+        runMenuProcessor( &mdMainMenu );
+        break;
+      }
     case eMenuType_BeerProfile: {
-      runMenuProcessor( &mdBeerProfileMenu );
-      break;
-    }
+        runMenuProcessor( &mdBeerProfileMenu );
+        break;
+      }
     case eMenuType_Stage: {
-      runMenuProcessor( &mdStageMenu );
-      break;
-    }
+        runMenuProcessor( &mdStageMenu );
+        break;
+      }
     case eMenuType_Malt: {
-      runMenuProcessor( &mdMaltMenu );
-      break;
-    }
+        runMenuProcessor( &mdMaltMenu );
+        break;
+      }
     case eMenuType_Settings: {
-      runMenuProcessor( &mdSettingsMenu );
-      break;
-    }
+        runMenuProcessor( &mdSettingsMenu );
+        break;
+      }
     case eMenuType_StartFromStage: {
-      runMenuProcessor( &mdStartFromStageMenu );
-      break;
-    }
+        runMenuProcessor( &mdStartFromStageMenu );
+        break;
+      }
   }
 
 #ifdef DEBUG_OFF
@@ -985,7 +994,7 @@ void runMenu() {
 // ************************ MENU SELECTIONS ******************************
 void runMainMenuSelection() {
   switch (mdMainMenu._selection) {
-  //switch (eMainMenuSelection) {
+    //switch (eMainMenuSelection) {
     case eMainMenu_GO: {
         xStartStage( NULL, NULL, eCookingStage_Startpoint, true, true, false, false );
         break;
@@ -1112,205 +1121,205 @@ void runStartFromStageSelection() {
 void runBeerProfileSelection() {
   switch (mdBeerProfileMenu._selection) {
     case eBeerProfileMenu_Basic: {
-      beerProfile                 =   eBeerProfile_Basic;
-      startpointTime              =   PROFILE_BASIC_STARTPOINT_TIME;
-      betaGlucanaseTime           =   PROFILE_BASIC_BETAGLUCANASE_TIME;
-      debranchingTime             =   PROFILE_BASIC_DEBRANCHING_TIME;
-      proteolyticTime             =   PROFILE_BASIC_PROTEOLYTIC_TIME;
-      betaAmylaseTime             =   PROFILE_BASIC_BETAAMYLASE_TIME;
-      alphaAmylaseTime            =   PROFILE_BASIC_ALPHAAMYLASE_TIME;
-      mashoutTime                 =   PROFILE_BASIC_MASHOUT_TIME;
-      recirculationTime           =   PROFILE_BASIC_RECIRCULATION_TIME;
-      spargeTime                  =   PROFILE_BASIC_SPARGE_TIME;
-      boilTime                    =   PROFILE_BASIC_BOIL_TIME;
-      coolingTime                 =   PROFILE_BASIC_COOLING_TIME;
-      startpointTemperature       =   PROFILE_BASIC_STARTPOINT_TEMPERATURE;
-      betaGlucanaseTemperature    =   PROFILE_BASIC_BETAGLUCANASE_TEMPERATURE;
-      debranchingTemperature      =   PROFILE_BASIC_DEBRANCHING_TEMPERATURE;
-      proteolyticTemperature      =   PROFILE_BASIC_PROTEOLYTIC_TEMPERATURE;
-      betaAmylaseTemperature      =   PROFILE_BASIC_BETAAMYLASE_TEMPERATURE;
-      alphaAmylaseTemperature     =   PROFILE_BASIC_ALPHAAMYLASE_TEMPERATURE;
-      mashoutTemperature          =   PROFILE_BASIC_MASHOUT_TEMPERATURE;
-      recirculationTemperature    =   PROFILE_BASIC_RECIRCULATION_TEMPERATURE;
-      spargeTemperature           =   PROFILE_BASIC_SPARGE_TEMPERATURE;
-      boilTemperature             =   PROFILE_BASIC_BOIL_TEMPERATURE;
-      coolingTemperature          =   PROFILE_BASIC_COOLING_TEMPERATURE;
-      
-      backToStatus();
-      break;
-    }
+        beerProfile                 =   eBeerProfile_Basic;
+        startpointTime              =   PROFILE_BASIC_STARTPOINT_TIME;
+        betaGlucanaseTime           =   PROFILE_BASIC_BETAGLUCANASE_TIME;
+        debranchingTime             =   PROFILE_BASIC_DEBRANCHING_TIME;
+        proteolyticTime             =   PROFILE_BASIC_PROTEOLYTIC_TIME;
+        betaAmylaseTime             =   PROFILE_BASIC_BETAAMYLASE_TIME;
+        alphaAmylaseTime            =   PROFILE_BASIC_ALPHAAMYLASE_TIME;
+        mashoutTime                 =   PROFILE_BASIC_MASHOUT_TIME;
+        recirculationTime           =   PROFILE_BASIC_RECIRCULATION_TIME;
+        spargeTime                  =   PROFILE_BASIC_SPARGE_TIME;
+        boilTime                    =   PROFILE_BASIC_BOIL_TIME;
+        coolingTime                 =   PROFILE_BASIC_COOLING_TIME;
+        startpointTemperature       =   PROFILE_BASIC_STARTPOINT_TEMPERATURE;
+        betaGlucanaseTemperature    =   PROFILE_BASIC_BETAGLUCANASE_TEMPERATURE;
+        debranchingTemperature      =   PROFILE_BASIC_DEBRANCHING_TEMPERATURE;
+        proteolyticTemperature      =   PROFILE_BASIC_PROTEOLYTIC_TEMPERATURE;
+        betaAmylaseTemperature      =   PROFILE_BASIC_BETAAMYLASE_TEMPERATURE;
+        alphaAmylaseTemperature     =   PROFILE_BASIC_ALPHAAMYLASE_TEMPERATURE;
+        mashoutTemperature          =   PROFILE_BASIC_MASHOUT_TEMPERATURE;
+        recirculationTemperature    =   PROFILE_BASIC_RECIRCULATION_TEMPERATURE;
+        spargeTemperature           =   PROFILE_BASIC_SPARGE_TEMPERATURE;
+        boilTemperature             =   PROFILE_BASIC_BOIL_TEMPERATURE;
+        coolingTemperature          =   PROFILE_BASIC_COOLING_TEMPERATURE;
+
+        backToStatus();
+        break;
+      }
     case eBeerProfileMenu_Trigo: {
-      beerProfile                 =   eBeerProfile_Trigo;
-      startpointTime              =   PROFILE_TRIGO_STARTPOINT_TIME;
-      betaGlucanaseTime           =   PROFILE_TRIGO_BETAGLUCANASE_TIME;
-      debranchingTime             =   PROFILE_TRIGO_DEBRANCHING_TIME;
-      proteolyticTime             =   PROFILE_TRIGO_PROTEOLYTIC_TIME;
-      betaAmylaseTime             =   PROFILE_TRIGO_BETAAMYLASE_TIME;
-      alphaAmylaseTime            =   PROFILE_TRIGO_ALPHAAMYLASE_TIME;
-      mashoutTime                 =   PROFILE_TRIGO_MASHOUT_TIME;
-      recirculationTime           =   PROFILE_TRIGO_RECIRCULATION_TIME;
-      spargeTime                  =   PROFILE_TRIGO_SPARGE_TIME;
-      boilTime                    =   PROFILE_TRIGO_BOIL_TIME;
-      coolingTime                 =   PROFILE_TRIGO_COOLING_TIME;
-      startpointTemperature       =   PROFILE_TRIGO_STARTPOINT_TEMPERATURE;
-      betaGlucanaseTemperature    =   PROFILE_TRIGO_BETAGLUCANASE_TEMPERATURE;
-      debranchingTemperature      =   PROFILE_TRIGO_DEBRANCHING_TEMPERATURE;
-      proteolyticTemperature      =   PROFILE_TRIGO_PROTEOLYTIC_TEMPERATURE;
-      betaAmylaseTemperature      =   PROFILE_TRIGO_BETAAMYLASE_TEMPERATURE;
-      alphaAmylaseTemperature     =   PROFILE_TRIGO_ALPHAAMYLASE_TEMPERATURE;
-      mashoutTemperature          =   PROFILE_TRIGO_MASHOUT_TEMPERATURE;
-      recirculationTemperature    =   PROFILE_TRIGO_RECIRCULATION_TEMPERATURE;
-      spargeTemperature           =   PROFILE_TRIGO_SPARGE_TEMPERATURE;
-      boilTemperature             =   PROFILE_TRIGO_BOIL_TEMPERATURE;
-      coolingTemperature          =   PROFILE_TRIGO_COOLING_TEMPERATURE;
+        beerProfile                 =   eBeerProfile_Trigo;
+        startpointTime              =   PROFILE_TRIGO_STARTPOINT_TIME;
+        betaGlucanaseTime           =   PROFILE_TRIGO_BETAGLUCANASE_TIME;
+        debranchingTime             =   PROFILE_TRIGO_DEBRANCHING_TIME;
+        proteolyticTime             =   PROFILE_TRIGO_PROTEOLYTIC_TIME;
+        betaAmylaseTime             =   PROFILE_TRIGO_BETAAMYLASE_TIME;
+        alphaAmylaseTime            =   PROFILE_TRIGO_ALPHAAMYLASE_TIME;
+        mashoutTime                 =   PROFILE_TRIGO_MASHOUT_TIME;
+        recirculationTime           =   PROFILE_TRIGO_RECIRCULATION_TIME;
+        spargeTime                  =   PROFILE_TRIGO_SPARGE_TIME;
+        boilTime                    =   PROFILE_TRIGO_BOIL_TIME;
+        coolingTime                 =   PROFILE_TRIGO_COOLING_TIME;
+        startpointTemperature       =   PROFILE_TRIGO_STARTPOINT_TEMPERATURE;
+        betaGlucanaseTemperature    =   PROFILE_TRIGO_BETAGLUCANASE_TEMPERATURE;
+        debranchingTemperature      =   PROFILE_TRIGO_DEBRANCHING_TEMPERATURE;
+        proteolyticTemperature      =   PROFILE_TRIGO_PROTEOLYTIC_TEMPERATURE;
+        betaAmylaseTemperature      =   PROFILE_TRIGO_BETAAMYLASE_TEMPERATURE;
+        alphaAmylaseTemperature     =   PROFILE_TRIGO_ALPHAAMYLASE_TEMPERATURE;
+        mashoutTemperature          =   PROFILE_TRIGO_MASHOUT_TEMPERATURE;
+        recirculationTemperature    =   PROFILE_TRIGO_RECIRCULATION_TEMPERATURE;
+        spargeTemperature           =   PROFILE_TRIGO_SPARGE_TEMPERATURE;
+        boilTemperature             =   PROFILE_TRIGO_BOIL_TEMPERATURE;
+        coolingTemperature          =   PROFILE_TRIGO_COOLING_TEMPERATURE;
 
-      backToStatus();
-      break;
-    }
+        backToStatus();
+        break;
+      }
     case eBeerProfileMenu_IPA: {
-      beerProfile                 =   eBeerProfile_IPA;
-      startpointTime              =   PROFILE_IPA_STARTPOINT_TIME;
-      betaGlucanaseTime           =   PROFILE_IPA_BETAGLUCANASE_TIME;
-      debranchingTime             =   PROFILE_IPA_DEBRANCHING_TIME;
-      proteolyticTime             =   PROFILE_IPA_PROTEOLYTIC_TIME;
-      betaAmylaseTime             =   PROFILE_IPA_BETAAMYLASE_TIME;
-      alphaAmylaseTime            =   PROFILE_IPA_ALPHAAMYLASE_TIME;
-      mashoutTime                 =   PROFILE_IPA_MASHOUT_TIME;
-      recirculationTime           =   PROFILE_IPA_RECIRCULATION_TIME;
-      spargeTime                  =   PROFILE_IPA_SPARGE_TIME;
-      boilTime                    =   PROFILE_IPA_BOIL_TIME;
-      coolingTime                 =   PROFILE_IPA_COOLING_TIME;
-      startpointTemperature       =   PROFILE_IPA_STARTPOINT_TEMPERATURE;
-      betaGlucanaseTemperature    =   PROFILE_IPA_BETAGLUCANASE_TEMPERATURE;
-      debranchingTemperature      =   PROFILE_IPA_DEBRANCHING_TEMPERATURE;
-      proteolyticTemperature      =   PROFILE_IPA_PROTEOLYTIC_TEMPERATURE;
-      betaAmylaseTemperature      =   PROFILE_IPA_BETAAMYLASE_TEMPERATURE;
-      alphaAmylaseTemperature     =   PROFILE_IPA_ALPHAAMYLASE_TEMPERATURE;
-      mashoutTemperature          =   PROFILE_IPA_MASHOUT_TEMPERATURE;
-      recirculationTemperature    =   PROFILE_IPA_RECIRCULATION_TEMPERATURE;
-      spargeTemperature           =   PROFILE_IPA_SPARGE_TEMPERATURE;
-      boilTemperature             =   PROFILE_IPA_BOIL_TEMPERATURE;
-      coolingTemperature          =   PROFILE_IPA_COOLING_TEMPERATURE;
+        beerProfile                 =   eBeerProfile_IPA;
+        startpointTime              =   PROFILE_IPA_STARTPOINT_TIME;
+        betaGlucanaseTime           =   PROFILE_IPA_BETAGLUCANASE_TIME;
+        debranchingTime             =   PROFILE_IPA_DEBRANCHING_TIME;
+        proteolyticTime             =   PROFILE_IPA_PROTEOLYTIC_TIME;
+        betaAmylaseTime             =   PROFILE_IPA_BETAAMYLASE_TIME;
+        alphaAmylaseTime            =   PROFILE_IPA_ALPHAAMYLASE_TIME;
+        mashoutTime                 =   PROFILE_IPA_MASHOUT_TIME;
+        recirculationTime           =   PROFILE_IPA_RECIRCULATION_TIME;
+        spargeTime                  =   PROFILE_IPA_SPARGE_TIME;
+        boilTime                    =   PROFILE_IPA_BOIL_TIME;
+        coolingTime                 =   PROFILE_IPA_COOLING_TIME;
+        startpointTemperature       =   PROFILE_IPA_STARTPOINT_TEMPERATURE;
+        betaGlucanaseTemperature    =   PROFILE_IPA_BETAGLUCANASE_TEMPERATURE;
+        debranchingTemperature      =   PROFILE_IPA_DEBRANCHING_TEMPERATURE;
+        proteolyticTemperature      =   PROFILE_IPA_PROTEOLYTIC_TEMPERATURE;
+        betaAmylaseTemperature      =   PROFILE_IPA_BETAAMYLASE_TEMPERATURE;
+        alphaAmylaseTemperature     =   PROFILE_IPA_ALPHAAMYLASE_TEMPERATURE;
+        mashoutTemperature          =   PROFILE_IPA_MASHOUT_TEMPERATURE;
+        recirculationTemperature    =   PROFILE_IPA_RECIRCULATION_TEMPERATURE;
+        spargeTemperature           =   PROFILE_IPA_SPARGE_TEMPERATURE;
+        boilTemperature             =   PROFILE_IPA_BOIL_TEMPERATURE;
+        coolingTemperature          =   PROFILE_IPA_COOLING_TEMPERATURE;
 
-      backToStatus();
-      break;
-    }
+        backToStatus();
+        break;
+      }
     case eBeerProfileMenu_Belga: {
-      beerProfile                 =   eBeerProfile_Belga;
-      startpointTime              =   PROFILE_BELGA_STARTPOINT_TIME;
-      betaGlucanaseTime           =   PROFILE_BELGA_BETAGLUCANASE_TIME;
-      debranchingTime             =   PROFILE_BELGA_DEBRANCHING_TIME;
-      proteolyticTime             =   PROFILE_BELGA_PROTEOLYTIC_TIME;
-      betaAmylaseTime             =   PROFILE_BELGA_BETAAMYLASE_TIME;
-      alphaAmylaseTime            =   PROFILE_BELGA_ALPHAAMYLASE_TIME;
-      mashoutTime                 =   PROFILE_BELGA_MASHOUT_TIME;
-      recirculationTime           =   PROFILE_BELGA_RECIRCULATION_TIME;
-      spargeTime                  =   PROFILE_BELGA_SPARGE_TIME;
-      boilTime                    =   PROFILE_BELGA_BOIL_TIME;
-      coolingTime                 =   PROFILE_BELGA_COOLING_TIME;
-      startpointTemperature       =   PROFILE_BELGA_STARTPOINT_TEMPERATURE;
-      betaGlucanaseTemperature    =   PROFILE_BELGA_BETAGLUCANASE_TEMPERATURE;
-      debranchingTemperature      =   PROFILE_BELGA_DEBRANCHING_TEMPERATURE;
-      proteolyticTemperature      =   PROFILE_BELGA_PROTEOLYTIC_TEMPERATURE;
-      betaAmylaseTemperature      =   PROFILE_BELGA_BETAAMYLASE_TEMPERATURE;
-      alphaAmylaseTemperature     =   PROFILE_BELGA_ALPHAAMYLASE_TEMPERATURE;
-      mashoutTemperature          =   PROFILE_BELGA_MASHOUT_TEMPERATURE;
-      recirculationTemperature    =   PROFILE_BELGA_RECIRCULATION_TEMPERATURE;
-      spargeTemperature           =   PROFILE_BELGA_SPARGE_TEMPERATURE;
-      boilTemperature             =   PROFILE_BELGA_BOIL_TEMPERATURE;
-      coolingTemperature          =   PROFILE_BELGA_COOLING_TEMPERATURE;
+        beerProfile                 =   eBeerProfile_Belga;
+        startpointTime              =   PROFILE_BELGA_STARTPOINT_TIME;
+        betaGlucanaseTime           =   PROFILE_BELGA_BETAGLUCANASE_TIME;
+        debranchingTime             =   PROFILE_BELGA_DEBRANCHING_TIME;
+        proteolyticTime             =   PROFILE_BELGA_PROTEOLYTIC_TIME;
+        betaAmylaseTime             =   PROFILE_BELGA_BETAAMYLASE_TIME;
+        alphaAmylaseTime            =   PROFILE_BELGA_ALPHAAMYLASE_TIME;
+        mashoutTime                 =   PROFILE_BELGA_MASHOUT_TIME;
+        recirculationTime           =   PROFILE_BELGA_RECIRCULATION_TIME;
+        spargeTime                  =   PROFILE_BELGA_SPARGE_TIME;
+        boilTime                    =   PROFILE_BELGA_BOIL_TIME;
+        coolingTime                 =   PROFILE_BELGA_COOLING_TIME;
+        startpointTemperature       =   PROFILE_BELGA_STARTPOINT_TEMPERATURE;
+        betaGlucanaseTemperature    =   PROFILE_BELGA_BETAGLUCANASE_TEMPERATURE;
+        debranchingTemperature      =   PROFILE_BELGA_DEBRANCHING_TEMPERATURE;
+        proteolyticTemperature      =   PROFILE_BELGA_PROTEOLYTIC_TEMPERATURE;
+        betaAmylaseTemperature      =   PROFILE_BELGA_BETAAMYLASE_TEMPERATURE;
+        alphaAmylaseTemperature     =   PROFILE_BELGA_ALPHAAMYLASE_TEMPERATURE;
+        mashoutTemperature          =   PROFILE_BELGA_MASHOUT_TEMPERATURE;
+        recirculationTemperature    =   PROFILE_BELGA_RECIRCULATION_TEMPERATURE;
+        spargeTemperature           =   PROFILE_BELGA_SPARGE_TEMPERATURE;
+        boilTemperature             =   PROFILE_BELGA_BOIL_TEMPERATURE;
+        coolingTemperature          =   PROFILE_BELGA_COOLING_TEMPERATURE;
 
-      backToStatus();
-      break;
-    }
+        backToStatus();
+        break;
+      }
     case eBeerProfileMenu_Red: {
-      beerProfile                 =   eBeerProfile_Red;
-      startpointTime              =   PROFILE_RED_STARTPOINT_TIME;
-      betaGlucanaseTime           =   PROFILE_RED_BETAGLUCANASE_TIME;
-      debranchingTime             =   PROFILE_RED_DEBRANCHING_TIME;
-      proteolyticTime             =   PROFILE_RED_PROTEOLYTIC_TIME;
-      betaAmylaseTime             =   PROFILE_RED_BETAAMYLASE_TIME;
-      alphaAmylaseTime            =   PROFILE_RED_ALPHAAMYLASE_TIME;
-      mashoutTime                 =   PROFILE_RED_MASHOUT_TIME;
-      recirculationTime           =   PROFILE_RED_RECIRCULATION_TIME;
-      spargeTime                  =   PROFILE_RED_SPARGE_TIME;
-      boilTime                    =   PROFILE_RED_BOIL_TIME;
-      coolingTime                 =   PROFILE_RED_COOLING_TIME;
-      startpointTemperature       =   PROFILE_RED_STARTPOINT_TEMPERATURE;
-      betaGlucanaseTemperature    =   PROFILE_RED_BETAGLUCANASE_TEMPERATURE;
-      debranchingTemperature      =   PROFILE_RED_DEBRANCHING_TEMPERATURE;
-      proteolyticTemperature      =   PROFILE_RED_PROTEOLYTIC_TEMPERATURE;
-      betaAmylaseTemperature      =   PROFILE_RED_BETAAMYLASE_TEMPERATURE;
-      alphaAmylaseTemperature     =   PROFILE_RED_ALPHAAMYLASE_TEMPERATURE;
-      mashoutTemperature          =   PROFILE_RED_MASHOUT_TEMPERATURE;
-      recirculationTemperature    =   PROFILE_RED_RECIRCULATION_TEMPERATURE;
-      spargeTemperature           =   PROFILE_RED_SPARGE_TEMPERATURE;
-      boilTemperature             =   PROFILE_RED_BOIL_TEMPERATURE;
-      coolingTemperature          =   PROFILE_RED_COOLING_TEMPERATURE;
+        beerProfile                 =   eBeerProfile_Red;
+        startpointTime              =   PROFILE_RED_STARTPOINT_TIME;
+        betaGlucanaseTime           =   PROFILE_RED_BETAGLUCANASE_TIME;
+        debranchingTime             =   PROFILE_RED_DEBRANCHING_TIME;
+        proteolyticTime             =   PROFILE_RED_PROTEOLYTIC_TIME;
+        betaAmylaseTime             =   PROFILE_RED_BETAAMYLASE_TIME;
+        alphaAmylaseTime            =   PROFILE_RED_ALPHAAMYLASE_TIME;
+        mashoutTime                 =   PROFILE_RED_MASHOUT_TIME;
+        recirculationTime           =   PROFILE_RED_RECIRCULATION_TIME;
+        spargeTime                  =   PROFILE_RED_SPARGE_TIME;
+        boilTime                    =   PROFILE_RED_BOIL_TIME;
+        coolingTime                 =   PROFILE_RED_COOLING_TIME;
+        startpointTemperature       =   PROFILE_RED_STARTPOINT_TEMPERATURE;
+        betaGlucanaseTemperature    =   PROFILE_RED_BETAGLUCANASE_TEMPERATURE;
+        debranchingTemperature      =   PROFILE_RED_DEBRANCHING_TEMPERATURE;
+        proteolyticTemperature      =   PROFILE_RED_PROTEOLYTIC_TEMPERATURE;
+        betaAmylaseTemperature      =   PROFILE_RED_BETAAMYLASE_TEMPERATURE;
+        alphaAmylaseTemperature     =   PROFILE_RED_ALPHAAMYLASE_TEMPERATURE;
+        mashoutTemperature          =   PROFILE_RED_MASHOUT_TEMPERATURE;
+        recirculationTemperature    =   PROFILE_RED_RECIRCULATION_TEMPERATURE;
+        spargeTemperature           =   PROFILE_RED_SPARGE_TEMPERATURE;
+        boilTemperature             =   PROFILE_RED_BOIL_TEMPERATURE;
+        coolingTemperature          =   PROFILE_RED_COOLING_TEMPERATURE;
 
-      backToStatus();
-      break;
-    }
+        backToStatus();
+        break;
+      }
     case eBeerProfileMenu_APA: {
-      beerProfile                 =   eBeerProfile_APA;
-      startpointTime              =   PROFILE_APA_STARTPOINT_TIME;
-      betaGlucanaseTime           =   PROFILE_APA_BETAGLUCANASE_TIME;
-      debranchingTime             =   PROFILE_APA_DEBRANCHING_TIME;
-      proteolyticTime             =   PROFILE_APA_PROTEOLYTIC_TIME;
-      betaAmylaseTime             =   PROFILE_APA_BETAAMYLASE_TIME;
-      alphaAmylaseTime            =   PROFILE_APA_ALPHAAMYLASE_TIME;
-      mashoutTime                 =   PROFILE_APA_MASHOUT_TIME;
-      recirculationTime           =   PROFILE_APA_RECIRCULATION_TIME;
-      spargeTime                  =   PROFILE_APA_SPARGE_TIME;
-      boilTime                    =   PROFILE_APA_BOIL_TIME;
-      coolingTime                 =   PROFILE_APA_COOLING_TIME;
-      startpointTemperature       =   PROFILE_APA_STARTPOINT_TEMPERATURE;
-      betaGlucanaseTemperature    =   PROFILE_APA_BETAGLUCANASE_TEMPERATURE;
-      debranchingTemperature      =   PROFILE_APA_DEBRANCHING_TEMPERATURE;
-      proteolyticTemperature      =   PROFILE_APA_PROTEOLYTIC_TEMPERATURE;
-      betaAmylaseTemperature      =   PROFILE_APA_BETAAMYLASE_TEMPERATURE;
-      alphaAmylaseTemperature     =   PROFILE_APA_ALPHAAMYLASE_TEMPERATURE;
-      mashoutTemperature          =   PROFILE_APA_MASHOUT_TEMPERATURE;
-      recirculationTemperature    =   PROFILE_APA_RECIRCULATION_TEMPERATURE;
-      spargeTemperature           =   PROFILE_APA_SPARGE_TEMPERATURE;
-      boilTemperature             =   PROFILE_APA_BOIL_TEMPERATURE;
-      coolingTemperature          =   PROFILE_APA_COOLING_TEMPERATURE;
+        beerProfile                 =   eBeerProfile_APA;
+        startpointTime              =   PROFILE_APA_STARTPOINT_TIME;
+        betaGlucanaseTime           =   PROFILE_APA_BETAGLUCANASE_TIME;
+        debranchingTime             =   PROFILE_APA_DEBRANCHING_TIME;
+        proteolyticTime             =   PROFILE_APA_PROTEOLYTIC_TIME;
+        betaAmylaseTime             =   PROFILE_APA_BETAAMYLASE_TIME;
+        alphaAmylaseTime            =   PROFILE_APA_ALPHAAMYLASE_TIME;
+        mashoutTime                 =   PROFILE_APA_MASHOUT_TIME;
+        recirculationTime           =   PROFILE_APA_RECIRCULATION_TIME;
+        spargeTime                  =   PROFILE_APA_SPARGE_TIME;
+        boilTime                    =   PROFILE_APA_BOIL_TIME;
+        coolingTime                 =   PROFILE_APA_COOLING_TIME;
+        startpointTemperature       =   PROFILE_APA_STARTPOINT_TEMPERATURE;
+        betaGlucanaseTemperature    =   PROFILE_APA_BETAGLUCANASE_TEMPERATURE;
+        debranchingTemperature      =   PROFILE_APA_DEBRANCHING_TEMPERATURE;
+        proteolyticTemperature      =   PROFILE_APA_PROTEOLYTIC_TEMPERATURE;
+        betaAmylaseTemperature      =   PROFILE_APA_BETAAMYLASE_TEMPERATURE;
+        alphaAmylaseTemperature     =   PROFILE_APA_ALPHAAMYLASE_TEMPERATURE;
+        mashoutTemperature          =   PROFILE_APA_MASHOUT_TEMPERATURE;
+        recirculationTemperature    =   PROFILE_APA_RECIRCULATION_TEMPERATURE;
+        spargeTemperature           =   PROFILE_APA_SPARGE_TEMPERATURE;
+        boilTemperature             =   PROFILE_APA_BOIL_TEMPERATURE;
+        coolingTemperature          =   PROFILE_APA_COOLING_TEMPERATURE;
 
-      backToStatus();
-      break;
-    }
+        backToStatus();
+        break;
+      }
     case eBeerProfileMenu_Custom: {
-      beerProfile                 =   eBeerProfile_Custom;
-      startpointTime              =   PROFILE_CUSTOM_STARTPOINT_TIME;
-      betaGlucanaseTime           =   PROFILE_CUSTOM_BETAGLUCANASE_TIME;
-      debranchingTime             =   PROFILE_CUSTOM_DEBRANCHING_TIME;
-      proteolyticTime             =   PROFILE_CUSTOM_PROTEOLYTIC_TIME;
-      betaAmylaseTime             =   PROFILE_CUSTOM_BETAAMYLASE_TIME;
-      alphaAmylaseTime            =   PROFILE_CUSTOM_ALPHAAMYLASE_TIME;
-      mashoutTime                 =   PROFILE_CUSTOM_MASHOUT_TIME;
-      recirculationTime           =   PROFILE_CUSTOM_RECIRCULATION_TIME;
-      spargeTime                  =   PROFILE_CUSTOM_SPARGE_TIME;
-      boilTime                    =   PROFILE_CUSTOM_BOIL_TIME;
-      coolingTime                 =   PROFILE_CUSTOM_COOLING_TIME;
-      startpointTemperature       =   PROFILE_CUSTOM_STARTPOINT_TEMPERATURE;
-      betaGlucanaseTemperature    =   PROFILE_CUSTOM_BETAGLUCANASE_TEMPERATURE;
-      debranchingTemperature      =   PROFILE_CUSTOM_DEBRANCHING_TEMPERATURE;
-      proteolyticTemperature      =   PROFILE_CUSTOM_PROTEOLYTIC_TEMPERATURE;
-      betaAmylaseTemperature      =   PROFILE_CUSTOM_BETAAMYLASE_TEMPERATURE;
-      alphaAmylaseTemperature     =   PROFILE_CUSTOM_ALPHAAMYLASE_TEMPERATURE;
-      mashoutTemperature          =   PROFILE_CUSTOM_MASHOUT_TEMPERATURE;
-      recirculationTemperature    =   PROFILE_CUSTOM_RECIRCULATION_TEMPERATURE;
-      spargeTemperature           =   PROFILE_CUSTOM_SPARGE_TEMPERATURE;
-      boilTemperature             =   PROFILE_CUSTOM_BOIL_TEMPERATURE;
-      coolingTemperature          =   PROFILE_CUSTOM_COOLING_TEMPERATURE;
+        beerProfile                 =   eBeerProfile_Custom;
+        startpointTime              =   PROFILE_CUSTOM_STARTPOINT_TIME;
+        betaGlucanaseTime           =   PROFILE_CUSTOM_BETAGLUCANASE_TIME;
+        debranchingTime             =   PROFILE_CUSTOM_DEBRANCHING_TIME;
+        proteolyticTime             =   PROFILE_CUSTOM_PROTEOLYTIC_TIME;
+        betaAmylaseTime             =   PROFILE_CUSTOM_BETAAMYLASE_TIME;
+        alphaAmylaseTime            =   PROFILE_CUSTOM_ALPHAAMYLASE_TIME;
+        mashoutTime                 =   PROFILE_CUSTOM_MASHOUT_TIME;
+        recirculationTime           =   PROFILE_CUSTOM_RECIRCULATION_TIME;
+        spargeTime                  =   PROFILE_CUSTOM_SPARGE_TIME;
+        boilTime                    =   PROFILE_CUSTOM_BOIL_TIME;
+        coolingTime                 =   PROFILE_CUSTOM_COOLING_TIME;
+        startpointTemperature       =   PROFILE_CUSTOM_STARTPOINT_TEMPERATURE;
+        betaGlucanaseTemperature    =   PROFILE_CUSTOM_BETAGLUCANASE_TEMPERATURE;
+        debranchingTemperature      =   PROFILE_CUSTOM_DEBRANCHING_TEMPERATURE;
+        proteolyticTemperature      =   PROFILE_CUSTOM_PROTEOLYTIC_TEMPERATURE;
+        betaAmylaseTemperature      =   PROFILE_CUSTOM_BETAAMYLASE_TEMPERATURE;
+        alphaAmylaseTemperature     =   PROFILE_CUSTOM_ALPHAAMYLASE_TEMPERATURE;
+        mashoutTemperature          =   PROFILE_CUSTOM_MASHOUT_TEMPERATURE;
+        recirculationTemperature    =   PROFILE_CUSTOM_RECIRCULATION_TEMPERATURE;
+        spargeTemperature           =   PROFILE_CUSTOM_SPARGE_TEMPERATURE;
+        boilTemperature             =   PROFILE_CUSTOM_BOIL_TEMPERATURE;
+        coolingTemperature          =   PROFILE_CUSTOM_COOLING_TEMPERATURE;
 
-      backToStatus();
-      break;
-    }
+        backToStatus();
+        break;
+      }
     case eBeerProfileMenu_Back: {
-      resetMenu( true );
-      break;
-    }
+        resetMenu( true );
+        break;
+      }
     default: {}
   }
   mdBeerProfileMenu._selection = eBeerProfileMenu_NULL;
@@ -1319,53 +1328,53 @@ void runBeerProfileSelection() {
 void runStageSelection() {
   switch (mdStageMenu._selection) {
     case eStageMenu_Startpoint: {
-      runStageSelection_Generic( &startpointTime, &startpointTemperature );
-      break;
-    }
+        runStageSelection_Generic( &startpointTime, &startpointTemperature );
+        break;
+      }
     case eStageMenu_BetaGlucanase: {
-      runStageSelection_Generic( &betaGlucanaseTime, &betaGlucanaseTemperature );
-      break;
-    }
+        runStageSelection_Generic( &betaGlucanaseTime, &betaGlucanaseTemperature );
+        break;
+      }
     case eStageMenu_Debranching: {
-      runStageSelection_Generic( &debranchingTime, &debranchingTemperature );
-      break;
-    }
+        runStageSelection_Generic( &debranchingTime, &debranchingTemperature );
+        break;
+      }
     case eStageMenu_Proteolytic: {
-      runStageSelection_Generic( &proteolyticTime, &proteolyticTemperature );
-      break;
-    }
+        runStageSelection_Generic( &proteolyticTime, &proteolyticTemperature );
+        break;
+      }
     case eStageMenu_BetaAmylase: {
-      runStageSelection_Generic( &betaAmylaseTime, &betaAmylaseTemperature );
-      break;
-    }
+        runStageSelection_Generic( &betaAmylaseTime, &betaAmylaseTemperature );
+        break;
+      }
     case eStageMenu_AlphaAmylase: {
-      runStageSelection_Generic( &alphaAmylaseTime, &alphaAmylaseTemperature );
-      break;
-    }
+        runStageSelection_Generic( &alphaAmylaseTime, &alphaAmylaseTemperature );
+        break;
+      }
     case eStageMenu_Mashout: {
-      runStageSelection_Generic( &mashoutTime, &mashoutTemperature );
-      break;
-    }
+        runStageSelection_Generic( &mashoutTime, &mashoutTemperature );
+        break;
+      }
     case eStageMenu_Recirculation: {
-      runStageSelection_Generic( &recirculationTime, &recirculationTemperature );
-      break;
-    }
+        runStageSelection_Generic( &recirculationTime, &recirculationTemperature );
+        break;
+      }
     case eStageMenu_Sparge: {
-      runStageSelection_Generic( &spargeTime, &spargeTemperature );
-      break;
-    }
+        runStageSelection_Generic( &spargeTime, &spargeTemperature );
+        break;
+      }
     case eStageMenu_Boil: {
-      runStageSelection_Generic( &boilTime, &boilTemperature );
-      break;
-    }
+        runStageSelection_Generic( &boilTime, &boilTemperature );
+        break;
+      }
     case eStageMenu_Cooling: {
-      runStageSelection_Generic( &coolingTime, &coolingTemperature );
-      break;
-    }
+        runStageSelection_Generic( &coolingTime, &coolingTemperature );
+        break;
+      }
     case eStageMenu_Back: {
-      resetMenu( true );
-      break;
-    }
+        resetMenu( true );
+        break;
+      }
     default: {}
   }
   mdStageMenu._selection = eStageMenu_NULL;
@@ -1375,7 +1384,7 @@ void runSettingsSelection() {
   switch (mdSettingsMenu._selection) {
     case eSettingsMenu_Pump: {
         bool bNewPumpStatus = xSetGenericValue( iPumpSpeed ? 0 : 1, PUMP_SPEED_DEFAULT, 0, 1, "pump", "bool" );
-        if( cancel ) {
+        if ( cancel ) {
           cancel = false;
         }
         else {
@@ -1402,9 +1411,9 @@ void runSettingsSelection() {
         break;
       }
     case eSettingsMenu_Back: {
-      resetMenu( true );
-      break;
-    }
+        resetMenu( true );
+        break;
+      }
     default: {}
   }
   mdSettingsMenu._selection = eSettingsMenu_NULL;
@@ -1415,15 +1424,15 @@ void runMaltSelection() {
     case eMaltMenu_CastleMalting_Chteau_Pilsen_2RS: {
         backToStatus();
         break;
-    }
+      }
     case eMaltMenu_CastleMalting_Wheat_Blanc: {
         backToStatus();
         break;
-    }
+      }
     case eMaltMenu_Back: {
-      resetMenu( true );
-      break;
-    }
+        resetMenu( true );
+        break;
+      }
     default: {}
   }
   mdMaltMenu._selection = eMaltMenu_NULL;
@@ -1437,28 +1446,28 @@ void runMenuProcessor( MenuData *data ) {
   repaint = displayGenericMenu( &lcd, data );             // Display menu
 
   if ( checkForEncoderSwitchPush( true ) ) {              // Read selection
-    if( cancel ) {
+    if ( cancel ) {
       resetMenu( true );
       return;
     }
     data->_selection = data->_position;
   }
-  
+
   (data->_selectionFunction)();                           // Run selection function
 }
 
 void runStageSelection_Generic( unsigned long * selectedStageTime, int *selectedStageTemperature) {
   unsigned long selectedStageTimeStorage = *selectedStageTime;
   int selectedStageTemperatureStorage = *selectedStageTemperature;
-  
+
   *selectedStageTime = getTimer( *selectedStageTime );
-  if( cancel ) {
+  if ( cancel ) {
     *selectedStageTime = selectedStageTimeStorage;
     cancel = false;
   }
   else {
     *selectedStageTemperature = getTemperature( *selectedStageTemperature );
-    if( cancel ) {
+    if ( cancel ) {
       *selectedStageTime = selectedStageTimeStorage;
       *selectedStageTemperature = selectedStageTemperatureStorage;
       cancel = false;
@@ -1479,12 +1488,12 @@ void xStartStage( unsigned long *stageTime, int *stageTemperature, eCookingStage
   int finalYieldStorage = finalYield;
   unsigned long stageTimeStorage = *stageTime;
   int stageTemperatureStorage = *stageTemperature;
-  
+
   if (bSetFinalYield) {
     finalYield = getFinalYield( finalYield, SETTING_MACHINE_YIELD_DEFAULT );
-    if( cancel ) {
+    if ( cancel ) {
       finalYield = finalYieldStorage;
-      
+
       cancel = false;
       backToStatus();
       return;
@@ -1492,10 +1501,10 @@ void xStartStage( unsigned long *stageTime, int *stageTemperature, eCookingStage
   }
   if (bSetTime) {
     (*stageTime) = getTimer( clockCounter / 1000, *stageTime );
-    if( cancel ) {
+    if ( cancel ) {
       finalYield = finalYieldStorage;
       *stageTime = stageTimeStorage;
-      
+
       cancel = false;
       backToStatus();
       return;
@@ -1503,17 +1512,17 @@ void xStartStage( unsigned long *stageTime, int *stageTemperature, eCookingStage
   }
   if (bSetTemperature) {
     (*stageTemperature) = getTemperature( cookTemperature, *stageTemperature );
-    if( cancel ) {
+    if ( cancel ) {
       finalYield = finalYieldStorage;
       *stageTime = stageTimeStorage;
       *stageTemperature = stageTemperatureStorage;
-      
+
       cancel = false;
       backToStatus();
       return;
     }
   }
-  
+
   xSafeHardwarePowerOff();                      // Stop anything that might be still going on
   if (bPurgePump) {
     xPurgePump();
@@ -1554,11 +1563,19 @@ void backToStatus() {
 
 // #################################################### Set Variables ##################################################################
 
-int getTemperature(int initialValue ) { return getTemperature( initialValue, initialValue ); }
-int getTemperature(int initialValue, int defaultValue ) { return xSetGenericValue( initialValue, defaultValue, TEMPERATURE_MIN_VALUE, TEMPERATURE_MAX_VALUE, MENU_GLOBAL_STR_TEMPERATURE, MENU_GLOBAL_STR_CELSIUS ); }
+int getTemperature(int initialValue ) {
+  return getTemperature( initialValue, initialValue );
+}
+int getTemperature(int initialValue, int defaultValue ) {
+  return xSetGenericValue( initialValue, defaultValue, TEMPERATURE_MIN_VALUE, TEMPERATURE_MAX_VALUE, MENU_GLOBAL_STR_TEMPERATURE, MENU_GLOBAL_STR_CELSIUS );
+}
 
-int getFinalYield( int initialValue ) { return getFinalYield( initialValue, SETTING_MACHINE_YIELD_DEFAULT ); }
-int getFinalYield( int initialValue, int defaultValue ) { return xSetGenericValue( initialValue, defaultValue, SETTING_MACHINE_YIELD_CAPACITY_MIN, SETTING_MACHINE_YIELD_CAPACITY_MAX, "Final Yield", "l" ); }
+int getFinalYield( int initialValue ) {
+  return getFinalYield( initialValue, SETTING_MACHINE_YIELD_DEFAULT );
+}
+int getFinalYield( int initialValue, int defaultValue ) {
+  return xSetGenericValue( initialValue, defaultValue, SETTING_MACHINE_YIELD_CAPACITY_MIN, SETTING_MACHINE_YIELD_CAPACITY_MAX, "Final Yield", "l" );
+}
 
 int xSetGenericValue(int initialValue, int defaultValue, int minimumValue, int maximumValue, const char *valueName, const char *unit) {
   xSetupRotaryEncoder( eRotaryEncoderMode_Generic, initialValue, maximumValue, minimumValue, 1, 5 );
@@ -1579,8 +1596,8 @@ int xSetGenericValue(int initialValue, int defaultValue, int minimumValue, int m
   lcd.print( unit );
 
   while (true) {
-    if( checkForEncoderSwitchPush( true ) ) {                   // Check if pushbutton is pressed
-      if( cancel ) return rotaryEncoderVirtualPosition;
+    if ( checkForEncoderSwitchPush( true ) ) {                  // Check if pushbutton is pressed
+      if ( cancel ) return rotaryEncoderVirtualPosition;
       break;
     }
     else {
@@ -1641,8 +1658,8 @@ int getTimer( int initialValue, int defaultValue ) {
   lcd.print("      0:00");
 
   while (true) {
-    if( checkForEncoderSwitchPush( true ) ) {
-      if( cancel ) return rotaryEncoderVirtualPosition;
+    if ( checkForEncoderSwitchPush( true ) ) {
+      if ( cancel ) return rotaryEncoderVirtualPosition;
       break;
     }
     else {
@@ -1683,13 +1700,13 @@ boolean checkForEncoderSwitchPush( bool cancelable ) {
     unsigned long cancleTimer = millis();
     while (digitalRead(ROTARY_ENCODER_SW_PIN)) {        // Wait until switch is released
       delay(ROTARY_ENCODER_SW_DEBOUNCE_TIME);           // debounce
-      
-      if( ((millis() - cancleTimer) >= SETTING_CANCEL_TIMER ) && cancelable ) {
+
+      if ( ((millis() - cancleTimer) >= SETTING_CANCEL_TIMER ) && cancelable ) {
         sing(BUZZ_1, PIEZO_PIN);
       }
     }
 
-    if( ((millis() - cancleTimer) >= SETTING_CANCEL_TIMER) && cancelable ) {
+    if ( ((millis() - cancleTimer) >= SETTING_CANCEL_TIMER) && cancelable ) {
       cancel = true;
     }
   }
@@ -1720,7 +1737,7 @@ unsigned long getInactivityTime() {
 
 void xWaitForAction(String title, String message) {
   while (true) {
-    if( checkForEncoderSwitchPush( false ) ) {                   // Check if pushbutton is pressed
+    if ( checkForEncoderSwitchPush( false ) ) {                  // Check if pushbutton is pressed
       break;
     }
     else {

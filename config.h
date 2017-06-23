@@ -13,6 +13,7 @@
 #define SETTING_MACHINE_YIELD_CAPACITY_MIN  0
 #define SETTING_MACHINE_YIELD_CAPACITY_MAX  50
 #define SETTING_MACHINE_YIELD_DEFAULT       25
+#define SETTING_MACHINE_LOGGING_INTERVAL    1000
 
 // ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
 #define HEATING_ELEMENT_DEFAULT_WINDOW_SIZE       1000
