@@ -260,6 +260,7 @@ void setup() {
   bStatusElement              =   false;
   windowStartTime             =   millis();
   dWattPerPulse               =   HEATING_ELEMENT_MAX_WATTAGE / HEATING_ELEMENT_AC_FREQUENCY_HZ;
+  dWattage                    =   0.0;
 
   // ++++++++++++++++++++++++ Mixer ++++++++++++++++++++++++
 
@@ -439,7 +440,7 @@ double ulWattToWindowTime( double ulAppliedWatts ) {
 bool xRegulateTemperature( boolean bMaximumOfUpDown ) {
   double difference = 0;
   bool overTemperature = false;
-  double wattage = 0.0;
+  dWattage = 0.0;
 
   float tup = upPT100.getCurrentTemperature();
   float tdown = downPT100.getCurrentTemperature();
@@ -472,37 +473,37 @@ bool xRegulateTemperature( boolean bMaximumOfUpDown ) {
 
   // Calculate applied wattage, based on the distance from the target temperature
   if ( overTemperature ) {
-    wattage = 0.0;                      // turn it off
+    dWattage = 0.0;                      // turn it off
   }
   else {
     if ( difference <= 0.5 ) {
       if ( cookTemperature > 99.0 ) {
-        wattage = 2000.0;               // pulse hardly at 2000 watt
+        dWattage = 2000.0;               // pulse hardly at 2000 watt
       }
       else {
         if ( cookTemperature > 70.0 ) {
-          wattage = 1000.0;             // pulse moderately at 1000 watt
+          dWattage = 1000.0;             // pulse moderately at 1000 watt
         }
         else {
-          wattage = 500.0;              // pulse lightly at 500 watt
+          dWattage = 500.0;              // pulse lightly at 500 watt
         }
       }
     }
     else {
       if ( difference <= 1.0 ) {
         if ( cookTemperature > 99.0 ) {
-          wattage = 2000.0;             // pulse hardly at 2000 watt
+          dWattage = 2000.0;             // pulse hardly at 2000 watt
         }
         else {
-          wattage = 1000.0;             // pulse moderately at 1000 watt
+          dWattage = 1000.0;             // pulse moderately at 1000 watt
         }
       }
       else {
         if ( difference <= 3.0 ) {
-          wattage = 2000.0;             // pulse hardly at 2000 watt
+          dWattage = 2000.0;             // pulse hardly at 2000 watt
         }
         else {
-          wattage = HEATING_ELEMENT_MAX_WATTAGE;  // pulse constantly at HEATING_ELEMENT_MAX_WATTAGE watt
+          dWattage = HEATING_ELEMENT_MAX_WATTAGE;  // pulse constantly at HEATING_ELEMENT_MAX_WATTAGE watt
         }
       }
     }
@@ -514,7 +515,7 @@ bool xRegulateTemperature( boolean bMaximumOfUpDown ) {
   }
 
   // Apply wattage to the element at the right time
-  if ( ulWattToWindowTime( wattage ) > (millis() - windowStartTime) ) {
+  if ( ulWattToWindowTime( dWattage ) > (millis() - windowStartTime) ) {
     digitalWrite(HEATING_ELEMENT_OUTPUT_PIN, HIGH);
     bStatusElement = true;
   } else {
@@ -526,11 +527,11 @@ bool xRegulateTemperature( boolean bMaximumOfUpDown ) {
   //debugPrintFunction("xRegulateTemperature");
   debugPrintVar("difference", difference);
   //debugPrintVar("overTemperature", overTemperature);
-  debugPrintVar("wattage", wattage);
-  //debugPrintVar("ulWattToWindowTime( wattage )", ulWattToWindowTime( wattage ) );
+  debugPrintVar("dWattage", dWattage);
+  //debugPrintVar("ulWattToWindowTime( dWattage )", ulWattToWindowTime( dWattage ) );
   //debugPrintVar("millis()", millis());
   //debugPrintVar("windowStartTime", windowStartTime);
-  //debugPrintVar("test", ulWattToWindowTime( wattage ) > (millis() - windowStartTime) );
+  //debugPrintVar("test", ulWattToWindowTime( dWattage ) > (millis() - windowStartTime) );
 #endif
 }
 
@@ -865,6 +866,8 @@ void xManageMachineSystems() {
     Serial.print(upPT100.getCurrentTemperature());
     Serial.print("|");
     Serial.print(downPT100.getCurrentTemperature());
+    Serial.print("|");
+    Serial.print(dWattage);
     Serial.print("|");
     if (bStatusElement) {
       Serial.print("1");
