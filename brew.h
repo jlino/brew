@@ -113,4 +113,8 @@ unsigned long getInactivityTime();
 
 void xWaitForAction(String title, String message);
 
+void printBeerProfile( void );
+void printTime( unsigned long timeToPrint );
+void printTemperature( int temparatureToPrint );
+
 #endif //__BREW

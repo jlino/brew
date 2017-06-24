@@ -108,6 +108,7 @@
 #define MELODY_SUPER_MARIO_START  3
 #define MELODY_UNDERWORLD_SHORT 4
 #define BUZZ_1 5
+#define BUZZ_2 6
 
 
 //  melody[] is an array of notes, accompanied by beats[],

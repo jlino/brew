@@ -12,8 +12,9 @@
 #define SETTING_CLEANING_TEMPERATURE			  45 //45
 #define SETTING_MACHINE_YIELD_CAPACITY_MIN  0
 #define SETTING_MACHINE_YIELD_CAPACITY_MAX  50
-#define SETTING_MACHINE_YIELD_DEFAULT       25
+#define SETTING_MACHINE_YIELD_DEFAULT       40
 #define SETTING_MACHINE_LOGGING_INTERVAL    1000
+#define SETTING_WARNING_BEEP_INTERVAL       5000
 
 // ++++++++++++++++++++++++ Heating Element Relay ++++++++++++++++++++++++
 #define HEATING_ELEMENT_DEFAULT_WINDOW_SIZE       1000
@@ -66,7 +67,7 @@
 // ++++++++++++++++++++++++ State Machine ++++++++++++++++++++++++
 #define SETTING_WELCOME_TIMEOUT                   100
 #define SETTING_MAX_INACTIVITY_TIME               3000
-#define SETTING_CANCEL_TIMER                      2000
+#define SETTING_CANCEL_TIMER                      1000
 #define MENU_INIT                                 eMenuType_Main
 #define MENU_SIZE_MAIN_MENU                       13
 #define MENU_SIZE_PROFILES_MENU                   9
@@ -74,7 +75,7 @@
 #define MENU_SIZE_MALT_MENU                    	  4
 #define MENU_SIZE_SETTINGS_MENU                   6
 #define SETTING_COOKING_STAGE_INIT                eCookingStage_Startpoint
-#define SETTING_BEER_PROFILE_INIT                 eBeerProfile_Basic
+#define SETTING_BEER_PROFILE_INIT                 eBeerProfile_Trigo
 
 // ++++++++++++++++++++++++ Menus ++++++++++++++++++++++++
 #define MENU_MAIN_TITLE                           "Brewery Menu"
@@ -123,7 +124,8 @@
 #define MENU_START_FUNCTION                       &runStartFromStageSelection
 
 // ++++++++++++++++++++++++ Serial Monotor ++++++++++++++++++++++++
-#define SETTING_SERIAL_MONITOR_BAUD_RATE          9600
+#define SETTING_SERIAL_MONITOR_BAUD_RATE          115200
+//#define SETTING_SERIAL_MONITOR_BAUD_RATE          9600
 #define SETTING_SERIAL_MONITOR_WELCOME_MESSAGE    "Let's start Brewing!"
 
 // ######################### LIBRARIES #########################

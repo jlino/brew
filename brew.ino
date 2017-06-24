@@ -310,30 +310,30 @@ void setup() {
   cookTemperature             =   25;
   finalYield                  =   SETTING_MACHINE_YIELD_DEFAULT;
 
-  startpointTime              =   PROFILE_BASIC_STARTPOINT_TIME;
-  betaGlucanaseTime           =   PROFILE_BASIC_BETAGLUCANASE_TIME;
-  debranchingTime             =   PROFILE_BASIC_DEBRANCHING_TIME;
-  proteolyticTime             =   PROFILE_BASIC_PROTEOLYTIC_TIME;
-  betaAmylaseTime             =   PROFILE_BASIC_BETAAMYLASE_TIME;
-  alphaAmylaseTime            =   PROFILE_BASIC_ALPHAAMYLASE_TIME;
-  mashoutTime                 =   PROFILE_BASIC_MASHOUT_TIME;
-  recirculationTime           =   PROFILE_BASIC_RECIRCULATION_TIME;
-  spargeTime                  =   PROFILE_BASIC_SPARGE_TIME;
-  boilTime                    =   PROFILE_BASIC_BOIL_TIME;
-  coolingTime                 =   PROFILE_BASIC_COOLING_TIME;
+  startpointTime              =   PROFILE_TRIGO_STARTPOINT_TIME;
+  betaGlucanaseTime           =   PROFILE_TRIGO_BETAGLUCANASE_TIME;
+  debranchingTime             =   PROFILE_TRIGO_DEBRANCHING_TIME;
+  proteolyticTime             =   PROFILE_TRIGO_PROTEOLYTIC_TIME;
+  betaAmylaseTime             =   PROFILE_TRIGO_BETAAMYLASE_TIME;
+  alphaAmylaseTime            =   PROFILE_TRIGO_ALPHAAMYLASE_TIME;
+  mashoutTime                 =   PROFILE_TRIGO_MASHOUT_TIME;
+  recirculationTime           =   PROFILE_TRIGO_RECIRCULATION_TIME;
+  spargeTime                  =   PROFILE_TRIGO_SPARGE_TIME;
+  boilTime                    =   PROFILE_TRIGO_BOIL_TIME;
+  coolingTime                 =   PROFILE_TRIGO_COOLING_TIME;
   cleaningTime                =   SETTING_CLEANING_TIME;
 
-  startpointTemperature       =   PROFILE_BASIC_STARTPOINT_TEMPERATURE;
-  betaGlucanaseTemperature    =   PROFILE_BASIC_BETAGLUCANASE_TEMPERATURE;
-  debranchingTemperature      =   PROFILE_BASIC_DEBRANCHING_TEMPERATURE;
-  proteolyticTemperature      =   PROFILE_BASIC_PROTEOLYTIC_TEMPERATURE;
-  betaAmylaseTemperature      =   PROFILE_BASIC_BETAAMYLASE_TEMPERATURE;
-  alphaAmylaseTemperature     =   PROFILE_BASIC_ALPHAAMYLASE_TEMPERATURE;
-  mashoutTemperature          =   PROFILE_BASIC_MASHOUT_TEMPERATURE;
-  recirculationTemperature    =   PROFILE_BASIC_RECIRCULATION_TEMPERATURE;
-  spargeTemperature           =   PROFILE_BASIC_SPARGE_TEMPERATURE;
-  boilTemperature             =   PROFILE_BASIC_BOIL_TEMPERATURE;
-  coolingTemperature          =   PROFILE_BASIC_COOLING_TEMPERATURE;
+  startpointTemperature       =   PROFILE_TRIGO_STARTPOINT_TEMPERATURE;
+  betaGlucanaseTemperature    =   PROFILE_TRIGO_BETAGLUCANASE_TEMPERATURE;
+  debranchingTemperature      =   PROFILE_TRIGO_DEBRANCHING_TEMPERATURE;
+  proteolyticTemperature      =   PROFILE_TRIGO_PROTEOLYTIC_TEMPERATURE;
+  betaAmylaseTemperature      =   PROFILE_TRIGO_BETAAMYLASE_TEMPERATURE;
+  alphaAmylaseTemperature     =   PROFILE_TRIGO_ALPHAAMYLASE_TEMPERATURE;
+  mashoutTemperature          =   PROFILE_TRIGO_MASHOUT_TEMPERATURE;
+  recirculationTemperature    =   PROFILE_TRIGO_RECIRCULATION_TEMPERATURE;
+  spargeTemperature           =   PROFILE_TRIGO_SPARGE_TEMPERATURE;
+  boilTemperature             =   PROFILE_TRIGO_BOIL_TEMPERATURE;
+  coolingTemperature          =   PROFILE_TRIGO_COOLING_TEMPERATURE;
   cleaningTemperature         =   SETTING_CLEANING_TEMPERATURE;
 
   refresh                     =   true;
@@ -352,6 +352,8 @@ void setup() {
   xWelcomeUser                    ();
 
   xSetupRotaryEncoder             ( eRotaryEncoderMode_Menu, eMainMenu_GO, MENU_SIZE_MAIN_MENU - 1, 1, 1, 0 );
+
+  printBeerProfile();
 }
 
 // ######################### MAIN LOOP #########################
@@ -394,13 +396,15 @@ void xCountTheTime( int temperatureMarginRange, boolean bMaximumOfUpDown ) {
   }
 
   // Ignote time ticks if temperature is not within the acceptable margin for this stage
-  unsigned long elapsedTime = now - clockLastUpdate;
+  unsigned long lastWindowTime = now - clockLastUpdate;
   if ( temperatureCount < (cookTemperature - temperatureMarginRange) ) {
-    clockIgnore += elapsedTime;
+    clockIgnore += lastWindowTime;
   }
 
   // Calculate the remaining time on the clock
-  clockCounter = cookTime * 1000 - (elapsedTime - clockIgnore);
+  //clockCounter = cookTime * 1000 - (lastWindowTime - clockIgnore);
+  unsigned long elepsedTime = now - clockStartTime;
+  clockCounter = cookTime * 1000 - (elepsedTime - clockIgnore);
 
   // Don't let clock get bellow 0
   if ( clockCounter < 0 ) {
@@ -531,6 +535,7 @@ bool xRegulateTemperature( boolean bMaximumOfUpDown ) {
 }
 
 void xPurgePump() {
+  lcdPrint(&lcd, "    Purging", "     Pump!");    // Write welcome
   for (int i = 0; i < 2; i++) {
     analogWrite(PUMP_PIN, PUMP_SPEED_MAX_MOSFET);  // analogWrite values from 0 to 255
     delay(1000);
@@ -837,6 +842,40 @@ void xManageMachineSystems() {
   upPT100.measure(false);
   downPT100.measure(true);
 
+#ifdef INFO
+  unsigned long now = millis();
+  if( now - loggingTimeInterval > SETTING_MACHINE_LOGGING_INTERVAL ) {
+    loggingTimeInterval = now;
+    Serial.print("|");
+    Serial.print(now);
+    Serial.print("|");
+    Serial.print(clockCounter);
+    Serial.print("|");
+    if (cooking) {
+      Serial.print("1");
+    }
+    else {
+      Serial.print("0");
+    }
+    Serial.print("|");
+    Serial.print(cookTemperature);
+    Serial.print("|");
+    Serial.print(basePT100.getCurrentTemperature());
+    Serial.print("|");
+    Serial.print(upPT100.getCurrentTemperature());
+    Serial.print("|");
+    Serial.print(downPT100.getCurrentTemperature());
+    Serial.print("|");
+    if (bStatusElement) {
+      Serial.print("1");
+    }
+    else {
+      Serial.print("0");
+    }
+    Serial.println("|");
+  } 
+#endif
+
   // If cooking is done, return (this is a nice place to double check safety and ensure the cooking parts aren't on.
   if (!cooking) {
     xSafeHardwarePowerOff();
@@ -906,41 +945,6 @@ void xManageMachineSystems() {
         break;
       }
   }
-
-#ifdef INFO
-  unsigned long now = millis();
-  if( now - loggingTimeInterval > SETTING_MACHINE_LOGGING_INTERVAL ) {
-    loggingTimeInterval = now;
-    Serial.print(now);
-    Serial.print("|");
-    Serial.print(clockCounter);
-    Serial.print("|");
-    if (cooking) {
-      Serial.print("1");
-    }
-    else {
-      Serial.print("0");
-    }
-    Serial.print("|");
-    Serial.print(cookTemperature);
-    Serial.print("|");
-    Serial.print(basePT100.getCurrentTemperature());
-    Serial.print("|");
-    Serial.print(upPT100.getCurrentTemperature());
-    Serial.print("|");
-    Serial.print(downPT100.getCurrentTemperature());
-    Serial.print("|");
-    if (bStatusElement) {
-      Serial.print("1");
-    }
-    else {
-      Serial.print("0");
-    }
-    Serial.print("|");
-  }
-
-  
-#endif
 }
 
 // ##################################################### Menus ###################################################################
@@ -1145,6 +1149,7 @@ void runBeerProfileSelection() {
         boilTemperature             =   PROFILE_BASIC_BOIL_TEMPERATURE;
         coolingTemperature          =   PROFILE_BASIC_COOLING_TEMPERATURE;
 
+        printBeerProfile();
         backToStatus();
         break;
       }
@@ -1173,6 +1178,7 @@ void runBeerProfileSelection() {
         boilTemperature             =   PROFILE_TRIGO_BOIL_TEMPERATURE;
         coolingTemperature          =   PROFILE_TRIGO_COOLING_TEMPERATURE;
 
+        printBeerProfile();
         backToStatus();
         break;
       }
@@ -1201,6 +1207,7 @@ void runBeerProfileSelection() {
         boilTemperature             =   PROFILE_IPA_BOIL_TEMPERATURE;
         coolingTemperature          =   PROFILE_IPA_COOLING_TEMPERATURE;
 
+        printBeerProfile();
         backToStatus();
         break;
       }
@@ -1229,6 +1236,7 @@ void runBeerProfileSelection() {
         boilTemperature             =   PROFILE_BELGA_BOIL_TEMPERATURE;
         coolingTemperature          =   PROFILE_BELGA_COOLING_TEMPERATURE;
 
+        printBeerProfile();
         backToStatus();
         break;
       }
@@ -1256,7 +1264,8 @@ void runBeerProfileSelection() {
         spargeTemperature           =   PROFILE_RED_SPARGE_TEMPERATURE;
         boilTemperature             =   PROFILE_RED_BOIL_TEMPERATURE;
         coolingTemperature          =   PROFILE_RED_COOLING_TEMPERATURE;
-
+        
+        printBeerProfile();
         backToStatus();
         break;
       }
@@ -1285,6 +1294,7 @@ void runBeerProfileSelection() {
         boilTemperature             =   PROFILE_APA_BOIL_TEMPERATURE;
         coolingTemperature          =   PROFILE_APA_COOLING_TEMPERATURE;
 
+        printBeerProfile();
         backToStatus();
         break;
       }
@@ -1313,6 +1323,7 @@ void runBeerProfileSelection() {
         boilTemperature             =   PROFILE_CUSTOM_BOIL_TEMPERATURE;
         coolingTemperature          =   PROFILE_CUSTOM_COOLING_TEMPERATURE;
 
+        printBeerProfile();
         backToStatus();
         break;
       }
@@ -1543,6 +1554,7 @@ void startBrewing() {
 
 void stopBrewing() {
   cooking = false;
+  xSafeHardwarePowerOff();
 }
 
 void resetMenu( boolean requestRepaintPaint ) {
@@ -1736,17 +1748,186 @@ unsigned long getInactivityTime() {
 // ###################### Set Variables ##################################################
 
 void xWaitForAction(String title, String message) {
+  unsigned long now = millis();
+  unsigned long warningBeepTimeInterval = 0;
   while (true) {
+    now = millis();
+    
     if ( checkForEncoderSwitchPush( false ) ) {                  // Check if pushbutton is pressed
       break;
     }
     else {
-      sing(BUZZ_1, PIEZO_PIN);
-
       // Print the message
       if (! lcdPrint(&lcd, title, message)) {
         break;
       }
+
+      unsigned long now = millis();
+      if( now - warningBeepTimeInterval > SETTING_WARNING_BEEP_INTERVAL ) {
+        warningBeepTimeInterval = now;
+        sing(BUZZ_2, PIEZO_PIN);
+      }
     }
   }
 }
+
+void printBeerProfile( void ) {
+  #ifdef INFO
+  Serial.println("############# Beer Profile #############");
+  Serial.print("#  beerProfile       ");
+  Serial.print( mdBeerProfileMenu._dialog[beerProfile+1] );
+  Serial.println("  #");
+  Serial.println("############ Time per Stage ############");
+  Serial.print("#  startpointTime              ");
+  printTime(startpointTime           );
+  Serial.println("  #");
+  Serial.print("#  betaGlucanaseTime           ");
+  printTime(betaGlucanaseTime        );
+  Serial.println("  #");
+  Serial.print("#  debranchingTime             ");
+  printTime(debranchingTime          );
+  Serial.println("  #");
+  Serial.print("#  proteolyticTime             ");
+  printTime(proteolyticTime          );
+  Serial.println("  #");
+  Serial.print("#  betaAmylaseTime             ");
+  printTime(betaAmylaseTime          );
+  Serial.println("  #");
+  Serial.print("#  alphaAmylaseTime            ");
+  printTime(alphaAmylaseTime         );
+  Serial.println("  #");
+  Serial.print("#  mashoutTime                 ");
+  printTime(mashoutTime              );
+  Serial.println("  #");
+  Serial.print("#  recirculationTime           ");
+  printTime(recirculationTime        );
+  Serial.println("  #");
+  Serial.print("#  spargeTime                  ");
+  printTime(spargeTime               );
+  Serial.println("  #");
+  Serial.print("#  boilTime                    ");
+  printTime(boilTime                 );
+  Serial.println("  #");
+  Serial.print("#  coolingTime                 ");
+  printTime(coolingTime              );
+  Serial.println("  #");
+  Serial.println("######## Teperature per Stage ##########");
+  Serial.print("#  startpointTemperature       ");
+  printTemperature(startpointTemperature    );
+  Serial.println("  #");
+  Serial.print("#  betaGlucanaseTemperature    ");
+  printTemperature(betaGlucanaseTemperature );
+  Serial.println("  #");
+  Serial.print("#  debranchingTemperature      ");
+  printTemperature(debranchingTemperature   );
+  Serial.println("  #");
+  Serial.print("#  proteolyticTemperature      ");
+  printTemperature(proteolyticTemperature   );
+  Serial.println("  #");
+  Serial.print("#  betaAmylaseTemperature      ");
+  printTemperature(betaAmylaseTemperature   );
+  Serial.println("  #");
+  Serial.print("#  alphaAmylaseTemperature     ");
+  printTemperature(alphaAmylaseTemperature  );
+  Serial.println("  #");
+  Serial.print("#  mashoutTemperature          ");
+  printTemperature(mashoutTemperature       );
+  Serial.println("  #");
+  Serial.print("#  recirculationTemperature    ");
+  printTemperature(recirculationTemperature );
+  Serial.println("  #");
+  Serial.print("#  spargeTemperature           ");
+  printTemperature(spargeTemperature        );
+  Serial.println("  #");
+  Serial.print("#  boilTemperature             ");
+  printTemperature(boilTemperature          );
+  Serial.println("  #");
+  Serial.print("#  coolingTemperature          ");
+  printTemperature(coolingTemperature       );
+  Serial.println("  #");
+  Serial.println("########################################");
+  if( beerProfile == eBeerProfile_Trigo) {
+    Serial.print("#  finalYield                    ");
+    if(finalYield < 10) {
+      Serial.print(" ");
+    }
+    Serial.print(finalYield);
+    Serial.println(" l  #");
+    float wheatAmount = PROFILE_TRIGO_WHEAT_MULTIPLIER * ((float) finalYield);
+    Serial.print("#  wheatAmount               ");
+    if(wheatAmount < 10) {
+      Serial.print(" ");
+    }
+    Serial.print(wheatAmount);
+    Serial.println(" Kg  #");
+    float pilsnerAmount = PROFILE_TRIGO_PILSNER_MULTIPLIER * ((float) finalYield);
+    Serial.print("#  pilsnerAmount             ");
+    if(pilsnerAmount < 10) {
+      Serial.print(" ");
+    }
+    Serial.print(pilsnerAmount);
+    Serial.println(" Kg  #");
+    float strikeWaterAmount = (pilsnerAmount + wheatAmount) * PROFILE_TRIGO_MASH_THICKNESS;
+    Serial.print("#  strikeWaterAmount          ");
+    if(strikeWaterAmount < 10) {
+      Serial.print(" ");
+    }
+    Serial.print(strikeWaterAmount);
+    Serial.println(" l  #");
+    float spargeWaterAmount = PROFILE_TRIGO_SPARGE_WATER_MULTIPLIER * ((float) finalYield);
+    Serial.print("#  spargeWaterAmount          ");
+    if(spargeWaterAmount < 10) {
+      Serial.print(" ");
+    }
+    Serial.print(spargeWaterAmount);
+    Serial.println(" l  #");
+    float herkulesAmount = PROFILE_TRIGO_HERKULES_MULTIPLIER * ((float) finalYield);
+    Serial.print("#  herkulesAmount             ");
+    if(herkulesAmount < 10) {
+      Serial.print(" ");
+    }
+    Serial.print(herkulesAmount);
+    Serial.println(" g  #");
+    float traditionAmount = PROFILE_TRIGO_TRADITION_MULTIPLIER * ((float) finalYield);
+    Serial.print("#  traditionAmount            ");
+    if(traditionAmount < 10) {
+      Serial.print(" ");
+    }
+    Serial.print(traditionAmount);
+    Serial.println(" g  #");
+    Serial.println("########################################");
+  }
+#endif
+}
+
+void printTime( unsigned long timeToPrint ) {
+  unsigned long minutes = timeToPrint /60;
+  unsigned long seconds = timeToPrint %60;
+
+  if (minutes < 100) {
+    Serial.print(" ");
+  }
+  if (minutes < 10) {
+    Serial.print(" ");
+  }
+  Serial.print(minutes);
+  Serial.print(":");
+  if (seconds < 10) {
+    Serial.print("0");
+  }
+  Serial.print(seconds);
+}
+
+void printTemperature( int temparatureToPrint ) {
+  if (temparatureToPrint < 100) {
+    Serial.print(" ");
+  }
+  if (temparatureToPrint < 10) {
+    Serial.print(" ");
+  }
+  Serial.print(temparatureToPrint);
+  Serial.print(" ");
+  Serial.write(176);
+  Serial.print("C");
+}
+
