@@ -93,6 +93,7 @@ unsigned long           rotarySwDetectTime;
 int                     iWindowSize;             // Time frame to operate in
 unsigned long           windowStartTime;
 double                  dWattPerPulse;
+double                  dWattage;
 
 // ++++++++++++++++++++++++ Pump ++++++++++++++++++++++++
 int                     iPumpSpeed;             // Time frame to operate in
