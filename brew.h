@@ -56,7 +56,7 @@ void xStartStageHeadless( eCookingStages nextStage, bool bPurgePump );
 
 void xStartStageInteractive( unsigned long *stageTime, int *stageTemperature, eCookingStages nextStage );
 
-void xCountTheTime( int temperatureRange, boolean bAverageUpDown );
+void xCountTheTime( float temperatureRange, boolean bAverageUpDown );
 
 bool isTimeLeft();
 
@@ -78,7 +78,7 @@ void xSetupStage(eCookingStages nextStage);
 
 void xTransitionIntoStage(eCookingStages nextStage);
 
-void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemperatureRange, eCookingStages nextStage, boolean bAverageUpDown );
+void xBasicStageOperation( int iStageTime, int iStageTemperature, float iStageTemperatureRange, eCookingStages nextStage, boolean bAverageUpDown );
 
 void xManageMachineSystems();
 

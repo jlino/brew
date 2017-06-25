@@ -379,7 +379,7 @@ void loop() {
 
 // ######################### FUNCTIONS ########################
 
-void xCountTheTime( int temperatureMarginRange, boolean bMaximumOfUpDown ) {
+void xCountTheTime( float temperatureMarginRange, boolean bMaximumOfUpDown ) {
   unsigned long now = millis();
 
   // Get current maximum sensed temperaure
@@ -808,7 +808,7 @@ void xTransitionIntoStage(eCookingStages nextStage) {
   xSetupStage( nextStage );
 }
 
-void xBasicStageOperation( int iStageTime, int iStageTemperature, int iStageTemperatureRange, eCookingStages nextStage, boolean bMaximumOfUpDown ) {
+void xBasicStageOperation( int iStageTime, int iStageTemperature, float iStageTemperatureRange, eCookingStages nextStage, boolean bMaximumOfUpDown ) {
 
   // Account for time spent at the target temperature | Input 1: range in ºC within which the target temperature is considered to be reached
 #ifdef DEBUG_OFF
@@ -851,14 +851,16 @@ void xManageMachineSystems() {
     Serial.print("|");
     Serial.print(now);
     Serial.print("|");
-    Serial.print(clockCounter);
-    Serial.print("|");
     if (cooking) {
       Serial.print("1");
     }
     else {
       Serial.print("0");
     }
+    Serial.print("|");
+    Serial.print( mdStageMenu._dialog[cookingStage+1] );
+    Serial.print("|");
+    Serial.print(clockCounter);
     Serial.print("|");
     Serial.print(cookTemperature);
     Serial.print("|");
@@ -890,51 +892,51 @@ void xManageMachineSystems() {
   // Operate the machine according to the current mode
   switch (cookingStage) {
     case eCookingStage_Startpoint: {
-        xBasicStageOperation( startpointTime, startpointTemperature, 0, eCookingStage_BetaGlucanase, false);
+        xBasicStageOperation( startpointTime, startpointTemperature, 0.0, eCookingStage_BetaGlucanase, false);
         break;
       }
     case eCookingStage_BetaGlucanase: {
-        xBasicStageOperation( betaGlucanaseTime, betaGlucanaseTemperature, 3, eCookingStage_Debranching, true );
+        xBasicStageOperation( betaGlucanaseTime, betaGlucanaseTemperature, 3.0, eCookingStage_Debranching, true );
         break;
       }
     case eCookingStage_Debranching: {
-        xBasicStageOperation( debranchingTime, debranchingTemperature, 3, eCookingStage_Proteolytic, true );
+        xBasicStageOperation( debranchingTime, debranchingTemperature, 3.0, eCookingStage_Proteolytic, true );
         break;
       }
     case eCookingStage_Proteolytic: {
-        xBasicStageOperation( proteolyticTime, proteolyticTemperature, 3, eCookingStage_BetaAmylase, true );
+        xBasicStageOperation( proteolyticTime, proteolyticTemperature, 3.0, eCookingStage_BetaAmylase, true );
         break;
       }
     case eCookingStage_BetaAmylase: {
-        xBasicStageOperation( betaAmylaseTime, betaAmylaseTemperature, 4, eCookingStage_AlphaAmylase, true );
+        xBasicStageOperation( betaAmylaseTime, betaAmylaseTemperature, 7.0, eCookingStage_AlphaAmylase, true );
         break;
       }
     case eCookingStage_AlphaAmylase: {
-        xBasicStageOperation( alphaAmylaseTime, alphaAmylaseTemperature, 2, eCookingStage_Mashout, true );
+        xBasicStageOperation( alphaAmylaseTime, alphaAmylaseTemperature, 2.5, eCookingStage_Mashout, true );
         break;
       }
     case eCookingStage_Mashout: {
-        xBasicStageOperation( mashoutTime, mashoutTemperature, 1, eCookingStage_Recirculation, true );
+        xBasicStageOperation( mashoutTime, mashoutTemperature, 1.0, eCookingStage_Recirculation, true );
         break;
       }
     case eCookingStage_Recirculation: {
-        xBasicStageOperation( recirculationTime, recirculationTemperature, 1, eCookingStage_Sparge, true );
+        xBasicStageOperation( recirculationTime, recirculationTemperature, 1.0, eCookingStage_Sparge, true );
         break;
       }
     case eCookingStage_Sparge: {
-        xBasicStageOperation( spargeTime, spargeTemperature, 3, eCookingStage_Boil, false );
+        xBasicStageOperation( spargeTime, spargeTemperature, 3.0, eCookingStage_Boil, false );
         break;
       }
     case eCookingStage_Boil: {
-        xBasicStageOperation( boilTime, boilTemperature, 2, eCookingStage_Cooling, false );
+        xBasicStageOperation( boilTime, boilTemperature, 2.0, eCookingStage_Cooling, false );
         break;
       }
     case eCookingStage_Cooling: {
-        xBasicStageOperation( coolingTime, coolingTemperature, 0, eCookingStage_Done, false );
+        xBasicStageOperation( coolingTime, coolingTemperature, 0.0, eCookingStage_Done, false );
         break;
       }
     case eCookingStage_Clean: {
-        xBasicStageOperation( cleaningTime, cleaningTemperature, 0, eCookingStage_Done, false );
+        xBasicStageOperation( cleaningTime, cleaningTemperature, 0.0, eCookingStage_Done, false );
         break;
       }
     case eCookingStage_Purge: {
